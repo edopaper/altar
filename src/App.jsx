@@ -3,21 +3,61 @@ import { Canvas } from '@react-three/fiber'
 import AltarScene from './components/AltarScene.jsx'
 import AltarMenu from './components/AltarMenu.jsx'
 import TransformToolbar from './components/TransformToolbar.jsx'
-import { MODEL_LIST } from './models.js'
+import MusicPlayer from './components/MusicPlayer.jsx'
+import { MODEL_CATEGORIES, MODEL_LIST } from './models.js'
 
 // Punto donde aparecen los objetos nuevos: centro del altar (nivel medio).
 const SPAWN_POSITION = [0, 1.0, -2.2]
 
 const SHAPE_LABELS = { cube: 'Cubo', sphere: 'Esfera', cone: 'Prisma' }
 
+const STORAGE_KEY = 'altar-objects-v1'
+
+// Restaura la escena guardada; descarta objetos cuyo .glb ya no exista en la
+// carpeta de modelos (p. ej. si se renombró o movió el archivo).
+function loadSavedObjects() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return []
+    const saved = JSON.parse(raw)
+    if (!Array.isArray(saved)) return []
+    const validPaths = new Set(MODEL_LIST.map((m) => m.path))
+    return saved.filter(
+      (o) => o && typeof o.id === 'number' && (o.type === 'shape' || validPaths.has(o.modelPath)),
+    )
+  } catch {
+    return []
+  }
+}
+
 let nextId = 1
 
 export default function App() {
-  const [objects, setObjects] = useState([])
+  const [objects, setObjects] = useState(() => {
+    const saved = loadSavedObjects()
+    nextId = saved.reduce((max, o) => Math.max(max, o.id), 0) + 1
+    return saved
+  })
   const [selectedId, setSelectedId] = useState(null)
   const [mode, setMode] = useState('translate')
   const [snap, setSnap] = useState(false)
   const focusRef = useRef(null) // lo llena AltarScene para centrar la cámara
+
+  // Autoguardado: cada cambio en la escena se persiste en localStorage.
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(objects))
+    } catch {
+      // almacenamiento lleno o bloqueado: se ignora, la app sigue funcionando
+    }
+  }, [objects])
+
+  const clearAltar = () => {
+    if (objects.length === 0) return
+    if (!window.confirm('¿Quitar todos los objetos del altar? Esta acción no se puede deshacer.')) return
+    setObjects([])
+    setSelectedId(null)
+  }
 
   const addShape = (shapeKind) => {
     const obj = {
@@ -117,6 +157,7 @@ export default function App() {
 
       <AltarMenu
         models={MODEL_LIST}
+        categories={MODEL_CATEGORIES}
         objects={objects}
         selected={selected}
         snap={snap}
@@ -127,11 +168,13 @@ export default function App() {
         onDuplicate={() => selected && duplicateObject(selected.id)}
         onDelete={() => selected && removeObject(selected.id)}
         onToggleSnap={() => setSnap((s) => !s)}
+        onClearAltar={clearAltar}
         mode={mode}
         onModeChange={setMode}
       />
 
       <TransformToolbar mode={mode} onModeChange={setMode} hasSelection={!!selected} />
+      <MusicPlayer />
     </div>
   )
 }

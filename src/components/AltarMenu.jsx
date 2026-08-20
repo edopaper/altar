@@ -6,6 +6,7 @@ const SHAPES = [
 
 export default function AltarMenu({
   models,
+  categories,
   objects,
   selected,
   snap,
@@ -17,6 +18,7 @@ export default function AltarMenu({
   onDuplicate,
   onDelete,
   onToggleSnap,
+  onClearAltar,
   onModeChange,
 }) {
   return (
@@ -34,11 +36,20 @@ export default function AltarMenu({
           ))}
         </div>
         <div className="menu-label">Modelo 3D ({models.length})</div>
-        <div className="model-grid">
-          {models.map((m) => (
-            <button key={m.path} className="model-btn" onClick={() => onAddModel(m)} title={m.name}>
-              {m.name}
-            </button>
+        <div className="category-list">
+          {categories.map((cat) => (
+            <details key={cat.category} className="category">
+              <summary className="category-header">
+                {cat.category} <span className="category-count">{cat.models.length}</span>
+              </summary>
+              <div className="model-grid">
+                {cat.models.map((m) => (
+                  <button key={m.path} className="model-btn" onClick={() => onAddModel(m)} title={m.name}>
+                    {m.name}
+                  </button>
+                ))}
+              </div>
+            </details>
           ))}
         </div>
       </section>
@@ -93,6 +104,10 @@ export default function AltarMenu({
           <input type="checkbox" checked={snap} onChange={onToggleSnap} />
           Snap a rejilla (0.1 u / 15°)
         </label>
+        <button className="btn btn--danger btn--block" onClick={onClearAltar} disabled={objects.length === 0}>
+          Limpiar altar
+        </button>
+        <div className="menu-note">La escena se guarda sola en este navegador.</div>
       </section>
 
       <div className="menu-hint">
