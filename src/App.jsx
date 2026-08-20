@@ -1,0 +1,137 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Canvas } from '@react-three/fiber'
+import AltarScene from './components/AltarScene.jsx'
+import AltarMenu from './components/AltarMenu.jsx'
+import TransformToolbar from './components/TransformToolbar.jsx'
+import { MODEL_LIST } from './models.js'
+
+// Punto donde aparecen los objetos nuevos: centro del altar (nivel medio).
+const SPAWN_POSITION = [0, 1.0, -2.2]
+
+const SHAPE_LABELS = { cube: 'Cubo', sphere: 'Esfera', cone: 'Prisma' }
+
+let nextId = 1
+
+export default function App() {
+  const [objects, setObjects] = useState([])
+  const [selectedId, setSelectedId] = useState(null)
+  const [mode, setMode] = useState('translate')
+  const [snap, setSnap] = useState(false)
+  const focusRef = useRef(null) // lo llena AltarScene para centrar la cámara
+
+  const addShape = (shapeKind) => {
+    const obj = {
+      id: nextId++,
+      type: 'shape',
+      shapeKind,
+      modelPath: null,
+      name: `${SHAPE_LABELS[shapeKind]} ${nextId - 1}`,
+      position: [...SPAWN_POSITION],
+      rotation: [0, 0, 0],
+      scale: [1, 1, 1],
+      color: '#e8873b',
+    }
+    setObjects((prev) => [...prev, obj])
+    setSelectedId(obj.id)
+  }
+
+  const addModel = (model) => {
+    const obj = {
+      id: nextId++,
+      type: 'model',
+      shapeKind: null,
+      modelPath: model.path,
+      name: `${model.name} ${nextId - 1}`,
+      position: [...SPAWN_POSITION],
+      rotation: [0, 0, 0],
+      scale: [1, 1, 1],
+      color: '#ffffff',
+    }
+    setObjects((prev) => [...prev, obj])
+    setSelectedId(obj.id)
+  }
+
+  const updateObject = useCallback((id, patch) => {
+    setObjects((prev) => prev.map((o) => (o.id === id ? { ...o, ...patch } : o)))
+  }, [])
+
+  const removeObject = (id) => {
+    setObjects((prev) => prev.filter((o) => o.id !== id))
+    setSelectedId((sel) => (sel === id ? null : sel))
+  }
+
+  const duplicateObject = (id) => {
+    const src = objects.find((o) => o.id === id)
+    if (!src) return
+    const copy = {
+      ...src,
+      id: nextId++,
+      name: `${src.name} (copia)`,
+      position: [src.position[0] + 0.3, src.position[1], src.position[2] + 0.3],
+    }
+    setObjects((prev) => [...prev, copy])
+    setSelectedId(copy.id)
+  }
+
+  const selectFromList = (id) => {
+    setSelectedId(id)
+    const obj = objects.find((o) => o.id === id)
+    if (obj && focusRef.current) focusRef.current(obj.position)
+  }
+
+  // Atajos estilo Blender: G mover, R rotar, S escalar
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+      const k = e.key.toLowerCase()
+      if (k === 'g') setMode('translate')
+      else if (k === 'r') setMode('rotate')
+      else if (k === 's') setMode('scale')
+      else if (k === 'escape') setSelectedId(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  const selected = objects.find((o) => o.id === selectedId) ?? null
+
+  return (
+    <div className="app">
+      <Canvas
+        shadows
+        camera={{ position: [0, 3.2, 5.5], fov: 50 }}
+        onPointerMissed={(e) => {
+          if (e.type === 'click') setSelectedId(null)
+        }}
+      >
+        <AltarScene
+          objects={objects}
+          selectedId={selectedId}
+          mode={mode}
+          snap={snap}
+          onSelect={setSelectedId}
+          onTransform={updateObject}
+          focusRef={focusRef}
+        />
+      </Canvas>
+
+      <AltarMenu
+        models={MODEL_LIST}
+        objects={objects}
+        selected={selected}
+        snap={snap}
+        onAddShape={addShape}
+        onAddModel={addModel}
+        onSelectObject={selectFromList}
+        onColorChange={(color) => selected && updateObject(selected.id, { color })}
+        onDuplicate={() => selected && duplicateObject(selected.id)}
+        onDelete={() => selected && removeObject(selected.id)}
+        onToggleSnap={() => setSnap((s) => !s)}
+        mode={mode}
+        onModeChange={setMode}
+      />
+
+      <TransformToolbar mode={mode} onModeChange={setMode} hasSelection={!!selected} />
+    </div>
+  )
+}
