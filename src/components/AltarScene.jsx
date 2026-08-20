@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from '@react-three/drei'
 import AltarObject from './AltarObject.jsx'
+import PhotoFrame from './PhotoFrame.jsx'
 
 const ALTAR_CENTER = new THREE.Vector3(0, 1, -2.2)
 
@@ -155,7 +156,7 @@ function CeremonialLights() {
       {/* Velas / puntos ámbar */}
       <pointLight
         color="#ffb877"
-        intensity={8}
+        intensity={2}
         distance={9}
         decay={2}
         position={[-1.8, 1.6, -1.4]}
@@ -166,7 +167,7 @@ function CeremonialLights() {
       />
       <pointLight
         color="#ffb877"
-        intensity={8}
+        intensity={2}
         distance={9}
         decay={2}
         position={[1.8, 1.6, -1.4]}
@@ -175,13 +176,13 @@ function CeremonialLights() {
         shadow-bias={-0.0002}
         shadow-normalBias={0.04}
       />
-      <pointLight color="#ffc48f" intensity={5} distance={7} decay={2} position={[0, 2.4, -2.8]} />
-      <pointLight color="#ffc48f" intensity={4} distance={7} decay={2} position={[0, 0.8, -0.4]} />
+      <pointLight color="#ffc48f" intensity={2} distance={7} decay={2} position={[0, 2.4, -2.8]} />
+      <pointLight color="#ffc48f" intensity={1.5} distance={7} decay={2} position={[0, 0.8, -0.4]} />
     </>
   )
 }
 
-export default function AltarScene({ objects, selectedId, mode, snap, onSelect, onTransform, focusRef }) {
+export default function AltarScene({ photo, objects, selectedId, mode, snap, onSelect, onTransform, focusRef }) {
   const orbitRef = useRef()
 
   // Expone a la UI una función para centrar la cámara en una posición.
@@ -205,6 +206,7 @@ export default function AltarScene({ objects, selectedId, mode, snap, onSelect, 
       <CeremonialLights />
       <Room />
       <AltarSteps />
+      <PhotoFrame photo={photo} />
 
       {objects.map((obj) => (
         <AltarObject

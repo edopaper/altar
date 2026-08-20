@@ -12,6 +12,24 @@ const SPAWN_POSITION = [0, 1.0, -2.2]
 const SHAPE_LABELS = { cube: 'Cubo', sphere: 'Esfera', cone: 'Prisma' }
 
 const STORAGE_KEY = 'altar-objects-v1'
+const PHOTO_KEY = 'altar-photo-v1'
+const PHOTO_MAX_BYTES = 5 * 1024 * 1024 // 5 MB
+const PHOTO_SIZE = 512
+
+// Redimensiona la imagen a 512x512 (recorte centrado tipo "cover") y la
+// devuelve como data URL JPEG lista para guardar en localStorage.
+async function processPhoto(file) {
+  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+  const side = Math.min(bitmap.width, bitmap.height)
+  const sx = (bitmap.width - side) / 2
+  const sy = (bitmap.height - side) / 2
+  const canvas = document.createElement('canvas')
+  canvas.width = PHOTO_SIZE
+  canvas.height = PHOTO_SIZE
+  canvas.getContext('2d').drawImage(bitmap, sx, sy, side, side, 0, 0, PHOTO_SIZE, PHOTO_SIZE)
+  bitmap.close()
+  return canvas.toDataURL('image/jpeg', 0.85)
+}
 
 // Restaura la escena guardada; descarta objetos cuyo .glb ya no exista en la
 // carpeta de modelos (p. ej. si se renombró o movió el archivo).
@@ -51,6 +69,32 @@ export default function App() {
       // almacenamiento lleno o bloqueado: se ignora, la app sigue funcionando
     }
   }, [objects])
+
+  const [photo, setPhoto] = useState(() => localStorage.getItem(PHOTO_KEY))
+
+  const uploadPhoto = async (file) => {
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      window.alert('El archivo debe ser una imagen.')
+      return
+    }
+    if (file.size > PHOTO_MAX_BYTES) {
+      window.alert('La imagen no puede pesar más de 5 MB.')
+      return
+    }
+    try {
+      const dataUrl = await processPhoto(file)
+      setPhoto(dataUrl)
+      localStorage.setItem(PHOTO_KEY, dataUrl)
+    } catch {
+      window.alert('No se pudo procesar la imagen.')
+    }
+  }
+
+  const removePhoto = () => {
+    setPhoto(null)
+    localStorage.removeItem(PHOTO_KEY)
+  }
 
   const clearAltar = () => {
     if (objects.length === 0) return
@@ -145,6 +189,7 @@ export default function App() {
         }}
       >
         <AltarScene
+          photo={photo}
           objects={objects}
           selectedId={selectedId}
           mode={mode}
@@ -169,6 +214,9 @@ export default function App() {
         onDelete={() => selected && removeObject(selected.id)}
         onToggleSnap={() => setSnap((s) => !s)}
         onClearAltar={clearAltar}
+        hasPhoto={!!photo}
+        onUploadPhoto={uploadPhoto}
+        onRemovePhoto={removePhoto}
         mode={mode}
         onModeChange={setMode}
       />

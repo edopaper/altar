@@ -119,6 +119,13 @@ canvas {
   margin-top: 6px;
 }
 
+.photo-upload {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
 .category-list {
   display: flex;
   flex-direction: column;

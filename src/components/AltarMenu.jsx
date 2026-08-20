@@ -20,6 +20,9 @@ export default function AltarMenu({
   onToggleSnap,
   onClearAltar,
   onModeChange,
+  hasPhoto,
+  onUploadPhoto,
+  onRemovePhoto,
 }) {
   return (
     <aside className="menu">
@@ -52,6 +55,30 @@ export default function AltarMenu({
             </details>
           ))}
         </div>
+      </section>
+
+      <section className="menu-section">
+        <h2>Fotografía</h2>
+        <div className="shape-row">
+          <label className="btn photo-upload">
+            {hasPhoto ? 'Cambiar foto' : 'Cargar foto'}
+            <input
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={(e) => {
+                onUploadPhoto(e.target.files?.[0])
+                e.target.value = '' // permite volver a elegir el mismo archivo
+              }}
+            />
+          </label>
+          {hasPhoto && (
+            <button className="btn btn--danger" onClick={onRemovePhoto}>
+              Quitar
+            </button>
+          )}
+        </div>
+        <div className="menu-note">Máx. 5 MB · se ajusta a 512×512</div>
       </section>
 
       <section className="menu-section">
