@@ -78,7 +78,7 @@ export default function AltarMenu({
             </button>
           )}
         </div>
-        <div className="menu-note">Máx. 5 MB · se ajusta a 512×512</div>
+        <div className="menu-note">Máx. 5 MB · se ajusta a 512 px conservando proporción</div>
       </section>
 
       <section className="menu-section">

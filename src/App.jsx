@@ -16,17 +16,15 @@ const PHOTO_KEY = 'altar-photo-v1'
 const PHOTO_MAX_BYTES = 5 * 1024 * 1024 // 5 MB
 const PHOTO_SIZE = 512
 
-// Redimensiona la imagen a 512x512 (recorte centrado tipo "cover") y la
-// devuelve como data URL JPEG lista para guardar en localStorage.
+// Escala la imagen conservando su proporción (máximo 512 px por lado, sin
+// recortar) y la devuelve como data URL JPEG lista para localStorage.
 async function processPhoto(file) {
   const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
-  const side = Math.min(bitmap.width, bitmap.height)
-  const sx = (bitmap.width - side) / 2
-  const sy = (bitmap.height - side) / 2
+  const scale = Math.min(1, PHOTO_SIZE / Math.max(bitmap.width, bitmap.height))
   const canvas = document.createElement('canvas')
-  canvas.width = PHOTO_SIZE
-  canvas.height = PHOTO_SIZE
-  canvas.getContext('2d').drawImage(bitmap, sx, sy, side, side, 0, 0, PHOTO_SIZE, PHOTO_SIZE)
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height)
   bitmap.close()
   return canvas.toDataURL('image/jpeg', 0.85)
 }
