@@ -2,6 +2,7 @@ import { Suspense, useRef } from 'react'
 import * as THREE from 'three'
 import { TransformControls, useHelper } from '@react-three/drei'
 import ModelLoader from './ModelLoader.jsx'
+import PaperCutout from './PaperCutout.jsx'
 
 const ROTATION_SNAP = THREE.MathUtils.degToRad(15)
 
@@ -52,6 +53,8 @@ export default function AltarObject({ object, selected, mode, snap, onSelect, on
       <Suspense fallback={<LoadingCube />}>
         <ModelLoader path={object.modelPath} />
       </Suspense>
+    ) : object.type === 'paper' ? (
+      <PaperCutout path={object.paperPath} color={object.color} />
     ) : (
       <mesh castShadow receiveShadow>
         <ShapeGeometry shapeKind={object.shapeKind} />

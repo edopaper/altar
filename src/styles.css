@@ -186,6 +186,10 @@ details[open] > .category-header::before {
   padding: 5px 0 8px 10px;
 }
 
+.model-grid--flat {
+  padding: 0 0 4px;
+}
+
 .model-btn {
   padding: 6px 4px;
   font-size: 10.5px;

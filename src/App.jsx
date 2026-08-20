@@ -5,6 +5,7 @@ import AltarMenu from './components/AltarMenu.jsx'
 import TransformToolbar from './components/TransformToolbar.jsx'
 import MusicPlayer from './components/MusicPlayer.jsx'
 import { MODEL_CATEGORIES, MODEL_LIST } from './models.js'
+import { PAPER_LIST } from './papel.js'
 
 // Punto donde aparecen los objetos nuevos: centro del altar (nivel medio).
 const SPAWN_POSITION = [0, 1.0, -2.2]
@@ -37,9 +38,14 @@ function loadSavedObjects() {
     if (!raw) return []
     const saved = JSON.parse(raw)
     if (!Array.isArray(saved)) return []
-    const validPaths = new Set(MODEL_LIST.map((m) => m.path))
+    const validModels = new Set(MODEL_LIST.map((m) => m.path))
+    const validPapers = new Set(PAPER_LIST.map((p) => p.path))
     return saved.filter(
-      (o) => o && typeof o.id === 'number' && (o.type === 'shape' || validPaths.has(o.modelPath)),
+      (o) =>
+        o &&
+        typeof o.id === 'number' &&
+        (o.type === 'shape' ||
+          (o.type === 'paper' ? validPapers.has(o.paperPath) : validModels.has(o.modelPath))),
     )
   } catch {
     return []
@@ -133,6 +139,23 @@ export default function App() {
     setSelectedId(obj.id)
   }
 
+  const addPaper = (paper) => {
+    const obj = {
+      id: nextId++,
+      type: 'paper',
+      shapeKind: null,
+      modelPath: null,
+      paperPath: paper.path,
+      name: `${paper.name} ${nextId - 1}`,
+      position: [0, 2.2, -2.2], // el papel picado suele ir colgado en alto
+      rotation: [0, 0, 0],
+      scale: [1, 1, 1],
+      color: '#d6217e', // rosa mexicano
+    }
+    setObjects((prev) => [...prev, obj])
+    setSelectedId(obj.id)
+  }
+
   const updateObject = useCallback((id, patch) => {
     setObjects((prev) => prev.map((o) => (o.id === id ? { ...o, ...patch } : o)))
   }, [])
@@ -206,6 +229,8 @@ export default function App() {
         snap={snap}
         onAddShape={addShape}
         onAddModel={addModel}
+        papers={PAPER_LIST}
+        onAddPaper={addPaper}
         onSelectObject={selectFromList}
         onColorChange={(color) => selected && updateObject(selected.id, { color })}
         onDuplicate={() => selected && duplicateObject(selected.id)}

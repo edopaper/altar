@@ -13,6 +13,8 @@ export default function AltarMenu({
   mode,
   onAddShape,
   onAddModel,
+  papers,
+  onAddPaper,
   onSelectObject,
   onColorChange,
   onDuplicate,
@@ -38,6 +40,18 @@ export default function AltarMenu({
             </button>
           ))}
         </div>
+        {papers.length > 0 && (
+          <>
+            <div className="menu-label">Papel picado</div>
+            <div className="model-grid model-grid--flat">
+              {papers.map((p) => (
+                <button key={p.path} className="model-btn" onClick={() => onAddPaper(p)} title={p.name}>
+                  {p.name}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
         <div className="menu-label">Modelo 3D ({models.length})</div>
         <div className="category-list">
           {categories.map((cat) => (
@@ -91,7 +105,7 @@ export default function AltarMenu({
                 className={`object-item ${selected?.id === o.id ? 'object-item--active' : ''}`}
                 onClick={() => onSelectObject(o.id)}
               >
-                <span className="object-dot" style={{ background: o.type === 'shape' ? o.color : '#8a7fb5' }} />
+                <span className="object-dot" style={{ background: o.type !== 'model' ? o.color : '#8a7fb5' }} />
                 {o.name}
               </button>
             </li>
@@ -113,7 +127,7 @@ export default function AltarMenu({
               Escalar
             </button>
           </div>
-          {selected.type === 'shape' && (
+          {selected.type !== 'model' && (
             <label className="color-row">
               Color
               <input type="color" value={selected.color} onChange={(e) => onColorChange(e.target.value)} />
