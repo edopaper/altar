@@ -32,10 +32,14 @@ export const MODEL_LIST = Object.keys(globbed)
   .map((key) => {
     const path = key.replace(/^\/public/, '')
     const parts = key.split('/')
-    const name = parts.pop().replace(/\.glb$/, '')
+    const name = prettify(parts.pop().replace(/\.glb$/, ''))
     // Subcarpeta entre .../altar/ y el archivo; sin subcarpeta cae en "varios"
     const folder = parts[parts.indexOf('altar') + 1] ?? 'varios'
-    return { name, path, category: CATEGORY_LABELS[folder] ?? prettify(folder) }
+    // Generado por scripts/generate-thumbnails.mjs; si aún no existe, el
+    // <img> del menú falla en silencio y cae de vuelta al texto (ver
+    // AltarMenu.jsx), así que no hace falta comprobarlo aquí.
+    const thumbnail = path.replace('/models/altar/', '/models/altar-thumbnails/').replace(/\.glb$/, '.png')
+    return { name, path, category: CATEGORY_LABELS[folder] ?? prettify(folder), thumbnail }
   })
   .sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name))
 

@@ -1,7 +1,8 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Billboard, Text } from '@react-three/drei'
 import * as THREE from 'three'
+import { registerSoulLight } from './SoulLights.jsx'
 
 const FLIGHT_DURATION = 9 // segundos que tarda en cruzar la escena
 const CHAR_INTERVAL = 0.055 // s por carácter revelado (máquina de escribir)
@@ -40,13 +41,17 @@ export default function SoulSpirit({ soul, onDone }) {
   const groupRef = useRef()
   const coreRef = useRef()
   const haloRef = useRef()
-  const lightRef = useRef()
   const startRef = useRef(null)
   const doneRef = useRef(false)
   const [charCount, setCharCount] = useState(0)
 
   const color = useMemo(() => COLORS[soul.colorIndex % COLORS.length], [soul.colorIndex])
   const halo = useMemo(() => getHaloTexture(), [])
+  // Entrada mutable en el pool compartido de luces (SoulLights): esta alma
+  // ya no trae su propia luz, así el conteo de luces de la escena no cambia
+  // cada vez que aparece o desaparece una.
+  const lightEntry = useMemo(() => ({ position: new THREE.Vector3(), color, intensity: 0 }), [color])
+  useEffect(() => registerSoulLight(lightEntry), [lightEntry])
   const { path, message } = soul
 
   useFrame(({ clock }) => {
@@ -64,6 +69,7 @@ export default function SoulSpirit({ soul, onDone }) {
     const x = THREE.MathUtils.lerp(path.x0, path.x1, progress)
     const y = path.baseY + Math.sin(progress * Math.PI) * path.arcHeight
     groupRef.current?.position.set(x, y, path.z)
+    lightEntry.position.set(x, y, path.z)
 
     let opacity = 1
     if (progress < FADE_IN_FRACTION) opacity = progress / FADE_IN_FRACTION
@@ -78,7 +84,7 @@ export default function SoulSpirit({ soul, onDone }) {
       haloRef.current.material.opacity = opacity * 0.8
       haloRef.current.scale.setScalar(0.55 * pulse)
     }
-    if (lightRef.current) lightRef.current.intensity = 1.3 * opacity * pulse
+    lightEntry.intensity = 1.3 * opacity * pulse
 
     const typingAge = Math.max(0, age - TYPEWRITER_START_DELAY)
     const chars = Math.floor(typingAge / CHAR_INTERVAL)
@@ -97,7 +103,6 @@ export default function SoulSpirit({ soul, onDone }) {
       <sprite ref={haloRef} scale={0.55}>
         <spriteMaterial map={halo} color={color} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} />
       </sprite>
-      <pointLight ref={lightRef} color={color} intensity={0} distance={2.4} decay={2} />
       <Billboard position={[0, 0.32, 0]}>
         <Text
           fontSize={0.11}

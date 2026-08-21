@@ -1,8 +1,25 @@
+import { useState } from 'react'
+
 const SHAPES = [
   { kind: 'cube', label: 'Cubo' },
   { kind: 'sphere', label: 'Esfera' },
   { kind: 'cone', label: 'Prisma' },
 ]
+
+// Botón de modelo con preview: si el thumbnail (generado por
+// scripts/generate-thumbnails.mjs) todavía no existe, la imagen falla en
+// silencio y el botón cae de vuelta a mostrar solo el nombre.
+function ModelThumbButton({ model, onClick }) {
+  const [broken, setBroken] = useState(false)
+  return (
+    <button className="model-btn" onClick={onClick} title={model.name}>
+      {!broken && (
+        <img className="model-thumb" src={model.thumbnail} alt="" loading="lazy" onError={() => setBroken(true)} />
+      )}
+      <span className="model-btn-label">{model.name}</span>
+    </button>
+  )
+}
 
 export default function AltarMenu({
   models,
@@ -30,6 +47,8 @@ export default function AltarMenu({
   clothColor,
   onClothColorChange,
   onHide,
+  maxObjects,
+  objectsWarningAt,
 }) {
   return (
     <aside className="menu">
@@ -74,9 +93,7 @@ export default function AltarMenu({
               </summary>
               <div className="model-grid">
                 {cat.models.map((m) => (
-                  <button key={m.path} className="model-btn" onClick={() => onAddModel(m)} title={m.name}>
-                    {m.name}
-                  </button>
+                  <ModelThumbButton key={m.path} model={m} onClick={() => onAddModel(m)} />
                 ))}
               </div>
             </details>
@@ -117,8 +134,21 @@ export default function AltarMenu({
       </section>
 
       <section className="menu-section">
-        <h2>Objetos en escena ({objects.length})</h2>
+        <h2>
+          Objetos en escena ({objects.length}/{maxObjects})
+        </h2>
         {objects.length === 0 && <div className="menu-empty">Aún no hay objetos</div>}
+        {objects.length >= maxObjects ? (
+          <div className="menu-note menu-note--danger">
+            Llegaste al máximo de {maxObjects} objetos. Elimina alguno para agregar otro.
+          </div>
+        ) : (
+          objects.length >= objectsWarningAt && (
+            <div className="menu-note menu-note--warn">
+              Vas en {objects.length} de {maxObjects}: cerca del límite pensado para que el altar siga fluido.
+            </div>
+          )
+        )}
         <ul className="object-list">
           {objects.map((o) => (
             <li key={o.id} className="object-row">

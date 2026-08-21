@@ -166,6 +166,14 @@ canvas {
   margin-top: 6px;
 }
 
+.menu-note--warn {
+  color: #ffc670;
+}
+
+.menu-note--danger {
+  color: #ff8a8a;
+}
+
 .photo-upload {
   display: flex;
   align-items: center;
@@ -238,20 +246,42 @@ details[open] > .category-header::before {
 }
 
 .model-btn {
-  padding: 6px 4px;
-  font-size: 10.5px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 4px 7px;
   border: 1px solid rgba(138, 127, 181, 0.3);
   border-radius: 5px;
   background: rgba(138, 127, 181, 0.1);
   color: #cfc8e8;
   cursor: pointer;
+}
+
+.model-btn:hover {
+  background: rgba(138, 127, 181, 0.3);
+}
+
+.model-thumb {
+  width: 100%;
+  height: 46px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
+}
+
+.model-btn-label {
+  width: 100%;
+  font-size: 10.5px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.model-btn:hover {
-  background: rgba(138, 127, 181, 0.3);
+/* Papel picado no tiene preview generado: solo texto, más alto para
+   compensar visualmente la falta de imagen. */
+.model-grid--flat .model-btn {
+  flex-direction: row;
+  padding: 6px 4px;
 }
 
 .object-list {

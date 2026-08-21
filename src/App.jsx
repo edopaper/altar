@@ -5,6 +5,7 @@ import AltarMenu from './components/AltarMenu.jsx'
 import TransformToolbar from './components/TransformToolbar.jsx'
 import MusicPlayer from './components/MusicPlayer.jsx'
 import AltarViewer from './components/AltarViewer.jsx'
+import ThumbnailStage from './components/ThumbnailStage.jsx'
 import { saveSharedAltar } from './storage.js'
 import { MODEL_CATEGORIES, MODEL_LIST } from './models.js'
 import { PAPER_LIST } from './papel.js'
@@ -18,6 +19,12 @@ const STORAGE_KEY = 'altar-objects-v1'
 const PHOTO_KEY = 'altar-photo-v1'
 const CLOTH_COLOR_KEY = 'altar-cloth-color-v1'
 const DEFAULT_CLOTH_COLOR = '#f7f2e8'
+
+// Tope de objetos: cada uno con sombra cuesta hasta 4 draw calls (el pase
+// normal más uno por cada luz que proyecta sombra), y el visor corre además
+// en celulares con mucho menos margen que una laptop de desarrollo.
+const MAX_OBJECTS = 150
+const OBJECTS_WARNING_THRESHOLD = 100
 const PHOTO_MAX_BYTES = 5 * 1024 * 1024 // 5 MB
 const PHOTO_SIZE = 512
 
@@ -71,6 +78,10 @@ function useHashRoute() {
 
 export default function App() {
   const hash = useHashRoute()
+  // Ruta oculta usada solo por scripts/generate-thumbnails.mjs, para
+  // renderizar un modelo a la vez sobre fondo transparente.
+  const thumbMatch = hash.match(/^#\/thumb\/(.+)$/)
+  if (thumbMatch) return <ThumbnailStage path={decodeURIComponent(thumbMatch[1])} />
   const viewMatch = hash.match(/^#\/ver\/([a-z0-9]+)/i)
   if (viewMatch) return <AltarViewer slug={viewMatch[1]} />
   return <AltarEditor />
@@ -161,7 +172,18 @@ function AltarEditor() {
     setSelectedId(null)
   }
 
+  // Tope compartido por las cuatro formas de sumar objetos (forma, modelo,
+  // papel picado, duplicar): evita seguir agregando pasado el límite.
+  const atObjectLimit = () => {
+    if (objects.length >= MAX_OBJECTS) {
+      window.alert(`El altar llegó al máximo de ${MAX_OBJECTS} objetos. Elimina alguno para agregar otro.`)
+      return true
+    }
+    return false
+  }
+
   const addShape = (shapeKind) => {
+    if (atObjectLimit()) return
     const obj = {
       id: nextId++,
       type: 'shape',
@@ -178,6 +200,7 @@ function AltarEditor() {
   }
 
   const addModel = (model) => {
+    if (atObjectLimit()) return
     const obj = {
       id: nextId++,
       type: 'model',
@@ -194,6 +217,7 @@ function AltarEditor() {
   }
 
   const addPaper = (paper) => {
+    if (atObjectLimit()) return
     const obj = {
       id: nextId++,
       type: 'paper',
@@ -224,6 +248,7 @@ function AltarEditor() {
   }
 
   const duplicateObject = (id) => {
+    if (atObjectLimit()) return
     const src = objects.find((o) => o.id === id)
     if (!src) return
     const copy = {
@@ -323,6 +348,8 @@ function AltarEditor() {
         onClothColorChange={setClothColor}
         mode={mode}
         onModeChange={setMode}
+        maxObjects={MAX_OBJECTS}
+        objectsWarningAt={OBJECTS_WARNING_THRESHOLD}
       />
       )}
 

@@ -6,6 +6,7 @@ import AltarObject from './AltarObject.jsx'
 import PhotoFrame from './PhotoFrame.jsx'
 import CandleLights from './CandleLights.jsx'
 import SoulField from './SoulField.jsx'
+import SoulLights from './SoulLights.jsx'
 
 const ALTAR_CENTER = new THREE.Vector3(0, 1, -2.2)
 
@@ -305,6 +306,7 @@ export default function AltarScene({
       <PhotoFrame photo={photo} />
       <CandleLights />
       <SoulField messages={messages} />
+      <SoulLights />
 
       {objects.map((obj) => (
         <AltarObject
