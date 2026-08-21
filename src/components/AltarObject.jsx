@@ -75,6 +75,8 @@ export default function AltarObject({ object, selected, mode, snap, onSelect, on
         rotation={object.rotation}
         scale={object.scale}
         onClick={(e) => {
+          // Un objeto bloqueado ignora el clic (no se selecciona por accidente)
+          if (object.locked) return
           e.stopPropagation()
           onSelect()
         }}
@@ -82,7 +84,7 @@ export default function AltarObject({ object, selected, mode, snap, onSelect, on
         {content}
       </group>
 
-      {selected && (
+      {selected && !object.locked && (
         <TransformControls
           object={groupRef}
           mode={mode}

@@ -16,11 +16,13 @@ export default function AltarMenu({
   papers,
   onAddPaper,
   onSelectObject,
+  onToggleLock,
   onColorChange,
   onDuplicate,
   onDelete,
   onToggleSnap,
   onClearAltar,
+  onShare,
   onModeChange,
   hasPhoto,
   onUploadPhoto,
@@ -100,13 +102,33 @@ export default function AltarMenu({
         {objects.length === 0 && <div className="menu-empty">Aún no hay objetos</div>}
         <ul className="object-list">
           {objects.map((o) => (
-            <li key={o.id}>
+            <li key={o.id} className="object-row">
               <button
                 className={`object-item ${selected?.id === o.id ? 'object-item--active' : ''}`}
                 onClick={() => onSelectObject(o.id)}
               >
                 <span className="object-dot" style={{ background: o.type !== 'model' ? o.color : '#8a7fb5' }} />
                 {o.name}
+              </button>
+              <button
+                className={`lock-btn ${o.locked ? 'lock-btn--locked' : ''}`}
+                onClick={() => onToggleLock(o.id)}
+                title={o.locked ? 'Desbloquear' : 'Bloquear'}
+                aria-label={o.locked ? `Desbloquear ${o.name}` : `Bloquear ${o.name}`}
+              >
+                {o.locked ? (
+                  // Candado cerrado
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" fill="currentColor" stroke="none" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                ) : (
+                  // Candado abierto
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" />
+                    <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+                  </svg>
+                )}
               </button>
             </li>
           ))}
@@ -135,8 +157,13 @@ export default function AltarMenu({
           )}
           <div className="shape-row">
             <button className="btn" onClick={onDuplicate}>Duplicar</button>
-            <button className="btn btn--danger" onClick={onDelete}>Eliminar</button>
+            <button className="btn btn--danger" onClick={onDelete} disabled={selected.locked}>
+              Eliminar
+            </button>
           </div>
+          {selected.locked && (
+            <div className="menu-note">Objeto bloqueado: desbloquéalo con el candado para editarlo.</div>
+          )}
         </section>
       )}
 
@@ -145,6 +172,9 @@ export default function AltarMenu({
           <input type="checkbox" checked={snap} onChange={onToggleSnap} />
           Snap a rejilla (0.1 u / 15°)
         </label>
+        <button className="btn btn--block" onClick={onShare} disabled={objects.length === 0 && !hasPhoto}>
+          Compartir altar
+        </button>
         <button className="btn btn--danger btn--block" onClick={onClearAltar} disabled={objects.length === 0}>
           Limpiar altar
         </button>

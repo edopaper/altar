@@ -4,6 +4,8 @@ import AltarScene from './components/AltarScene.jsx'
 import AltarMenu from './components/AltarMenu.jsx'
 import TransformToolbar from './components/TransformToolbar.jsx'
 import MusicPlayer from './components/MusicPlayer.jsx'
+import AltarViewer from './components/AltarViewer.jsx'
+import { saveSharedAltar } from './storage.js'
 import { MODEL_CATEGORIES, MODEL_LIST } from './models.js'
 import { PAPER_LIST } from './papel.js'
 
@@ -54,7 +56,25 @@ function loadSavedObjects() {
 
 let nextId = 1
 
+// Rutas por hash, sin dependencias: "#/" editor, "#/ver/<slug>" visor.
+function useHashRoute() {
+  const [hash, setHash] = useState(window.location.hash)
+  useEffect(() => {
+    const onChange = () => setHash(window.location.hash)
+    window.addEventListener('hashchange', onChange)
+    return () => window.removeEventListener('hashchange', onChange)
+  }, [])
+  return hash
+}
+
 export default function App() {
+  const hash = useHashRoute()
+  const viewMatch = hash.match(/^#\/ver\/([a-z0-9]+)/i)
+  if (viewMatch) return <AltarViewer slug={viewMatch[1]} />
+  return <AltarEditor />
+}
+
+function AltarEditor() {
   const [objects, setObjects] = useState(() => {
     const saved = loadSavedObjects()
     nextId = saved.reduce((max, o) => Math.max(max, o.id), 0) + 1
@@ -98,6 +118,30 @@ export default function App() {
   const removePhoto = () => {
     setPhoto(null)
     localStorage.removeItem(PHOTO_KEY)
+  }
+
+  // Publica un snapshot del altar bajo un slug y copia el enlace del visor.
+  const shareAltar = () => {
+    const slug = saveSharedAltar({ objects, photo })
+    const url = `${window.location.origin}${window.location.pathname}#/ver/${slug}`
+    navigator.clipboard?.writeText(url).catch(() => {})
+    window.alert(`Enlace del altar (copiado al portapapeles):\n${url}`)
+  }
+
+  // Captura la escena como PNG: deselecciona (para que no salga el gizmo),
+  // espera a que se pinte el siguiente frame y descarga el canvas.
+  const captureScreenshot = () => {
+    setSelectedId(null)
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const canvas = document.querySelector('canvas')
+        if (!canvas) return
+        const link = document.createElement('a')
+        link.download = `altar-${new Date().toISOString().slice(0, 10)}.png`
+        link.href = canvas.toDataURL('image/png')
+        link.click()
+      }),
+    )
   }
 
   const clearAltar = () => {
@@ -161,8 +205,12 @@ export default function App() {
   }, [])
 
   const removeObject = (id) => {
-    setObjects((prev) => prev.filter((o) => o.id !== id))
+    setObjects((prev) => prev.filter((o) => o.id !== id || o.locked))
     setSelectedId((sel) => (sel === id ? null : sel))
+  }
+
+  const toggleLock = (id) => {
+    setObjects((prev) => prev.map((o) => (o.id === id ? { ...o, locked: !o.locked } : o)))
   }
 
   const duplicateObject = (id) => {
@@ -204,6 +252,7 @@ export default function App() {
     <div className="app">
       <Canvas
         shadows
+        gl={{ preserveDrawingBuffer: true }} // necesario para capturar el canvas
         camera={{ position: [0, 3.2, 5.5], fov: 50 }}
         onPointerMissed={(e) => {
           if (e.type === 'click') setSelectedId(null)
@@ -232,11 +281,13 @@ export default function App() {
         papers={PAPER_LIST}
         onAddPaper={addPaper}
         onSelectObject={selectFromList}
+        onToggleLock={toggleLock}
         onColorChange={(color) => selected && updateObject(selected.id, { color })}
         onDuplicate={() => selected && duplicateObject(selected.id)}
         onDelete={() => selected && removeObject(selected.id)}
         onToggleSnap={() => setSnap((s) => !s)}
         onClearAltar={clearAltar}
+        onShare={shareAltar}
         hasPhoto={!!photo}
         onUploadPhoto={uploadPhoto}
         onRemovePhoto={removePhoto}
@@ -246,6 +297,17 @@ export default function App() {
 
       <TransformToolbar mode={mode} onModeChange={setMode} hasSelection={!!selected} />
       <MusicPlayer />
+      <button
+        className="capture-btn"
+        onClick={captureScreenshot}
+        title="Capturar imagen del altar"
+        aria-label="Capturar imagen del altar"
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+          <circle cx="12" cy="13" r="4" />
+        </svg>
+      </button>
     </div>
   )
 }

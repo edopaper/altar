@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import * as THREE from 'three'
 import { useThree } from '@react-three/fiber'
 import { Clone, useGLTF } from '@react-three/drei'
+import CandleFlame from './CandleFlame.jsx'
 
 const TEXTURE_SLOTS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap']
 
@@ -41,18 +42,25 @@ export default function ModelLoader({ path }) {
 
   useMemo(() => smoothTextures(scene, gl.capabilities.getMaxAnisotropy()), [scene, gl])
 
-  const { factor, offsetY } = useMemo(() => {
+  const { factor, offsetY, topY } = useMemo(() => {
     const box = new THREE.Box3().setFromObject(scene)
     const size = box.getSize(new THREE.Vector3())
     const maxDim = Math.max(size.x, size.y, size.z) || 1
     const f = TARGET_SIZE / maxDim
     // Apoya el modelo sobre su base (y=0 local) en lugar de su origen arbitrario.
-    return { factor: f, offsetY: -box.min.y * f }
+    return { factor: f, offsetY: -box.min.y * f, topY: size.y * f }
   }, [scene])
 
+  // Los modelos de la carpeta de velas llevan flama parpadeante en la punta.
+  // La flama va FUERA del group normalizado: las luces no escalan bien dentro.
+  const isCandle = path.includes('/velas-y-faroles/')
+
   return (
-    <group scale={factor} position={[0, offsetY, 0]}>
-      <Clone object={scene} castShadow receiveShadow deep />
-    </group>
+    <>
+      <group scale={factor} position={[0, offsetY, 0]}>
+        <Clone object={scene} castShadow receiveShadow deep />
+      </group>
+      {isCandle && <CandleFlame position={[0, topY + 0.015, 0]} />}
+    </>
   )
 }

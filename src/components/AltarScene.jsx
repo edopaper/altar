@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import { OrbitControls } from '@react-three/drei'
 import AltarObject from './AltarObject.jsx'
 import PhotoFrame from './PhotoFrame.jsx'
+import CandleLights from './CandleLights.jsx'
 
 const ALTAR_CENTER = new THREE.Vector3(0, 1, -2.2)
 
@@ -207,6 +208,7 @@ export default function AltarScene({ photo, objects, selectedId, mode, snap, onS
       <Room />
       <AltarSteps />
       <PhotoFrame photo={photo} />
+      <CandleLights />
 
       {objects.map((obj) => (
         <AltarObject
