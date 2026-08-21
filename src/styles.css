@@ -30,22 +30,63 @@ canvas {
   top: 0;
   left: 0;
   bottom: 0;
-  width: 280px;
+  width: 350px;
   overflow-y: auto;
-  padding: 16px;
   background: rgba(15, 12, 26, 0.92);
   border-right: 1px solid rgba(255, 170, 85, 0.2);
   backdrop-filter: blur(6px);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 170, 85, 0.35) transparent;
+}
+
+.menu::-webkit-scrollbar {
+  width: 8px;
+}
+
+.menu::-webkit-scrollbar-thumb {
+  background: rgba(255, 170, 85, 0.3);
+  border-radius: 4px;
+}
+
+.menu::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 170, 85, 0.5);
 }
 
 .menu-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  padding: 16px 16px 12px;
+  background: rgba(15, 12, 26, 0.97);
+  border-bottom: 1px solid rgba(255, 170, 85, 0.15);
+  backdrop-filter: blur(6px);
+}
+
+.menu-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 16px 16px;
+}
+
+.menu-section + .menu-section {
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  padding-top: 14px;
+}
+
+.menu-section--active {
+  margin: 0 -10px;
+  padding: 10px 10px 4px;
+  border-top: none !important;
+  border-radius: 8px;
+  background: rgba(255, 170, 85, 0.06);
+  border: 1px solid rgba(255, 170, 85, 0.2);
 }
 
 .menu-title {
@@ -188,6 +229,19 @@ canvas {
   max-height: 300px;
   overflow-y: auto;
   padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(138, 127, 181, 0.4) transparent;
+}
+
+.category-list::-webkit-scrollbar,
+.object-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.category-list::-webkit-scrollbar-thumb,
+.object-list::-webkit-scrollbar-thumb {
+  background: rgba(138, 127, 181, 0.35);
+  border-radius: 3px;
 }
 
 .category-header {
@@ -291,6 +345,8 @@ details[open] > .category-header::before {
   display: flex;
   flex-direction: column;
   gap: 3px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(138, 127, 181, 0.4) transparent;
 }
 
 .object-row {
@@ -381,6 +437,31 @@ details[open] > .category-header::before {
   font-size: 10.5px;
   color: #6f6690;
   line-height: 1.5;
+}
+
+.btn:focus-visible,
+.model-btn:focus-visible,
+.object-item:focus-visible,
+.lock-btn:focus-visible,
+.menu-hide-btn:focus-visible,
+.menu-show-btn:focus-visible,
+.category-header:focus-visible {
+  outline: 2px solid #ffb347;
+  outline-offset: 2px;
+}
+
+/* ---------- Menú: responsive (drawer en pantallas angostas) ---------- */
+@media (max-width: 640px) {
+  .menu {
+    width: 100%;
+    border-right: none;
+    box-shadow: 0 0 24px rgba(0, 0, 0, 0.5);
+  }
+
+  .menu-show-btn {
+    top: 12px;
+    left: 12px;
+  }
 }
 
 /* ---------- Visor de altar compartido ---------- */
