@@ -85,6 +85,7 @@ function AltarEditor() {
   const [selectedId, setSelectedId] = useState(null)
   const [mode, setMode] = useState('translate')
   const [snap, setSnap] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(true)
   const focusRef = useRef(null) // lo llena AltarScene para centrar la cámara
 
   // Autoguardado: cada cambio en la escena se persiste en localStorage.
@@ -280,7 +281,24 @@ function AltarEditor() {
         />
       </Canvas>
 
+      {!menuOpen && (
+        <button
+          className="menu-show-btn"
+          onClick={() => setMenuOpen(true)}
+          title="Mostrar menú"
+          aria-label="Mostrar menú"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
+      )}
+
+      {menuOpen && (
       <AltarMenu
+        onHide={() => setMenuOpen(false)}
         models={MODEL_LIST}
         categories={MODEL_CATEGORIES}
         objects={objects}
@@ -306,6 +324,7 @@ function AltarEditor() {
         mode={mode}
         onModeChange={setMode}
       />
+      )}
 
       <TransformToolbar mode={mode} onModeChange={setMode} hasSelection={!!selected} />
       <MusicPlayer />

@@ -41,10 +41,57 @@ canvas {
   gap: 14px;
 }
 
+.menu-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .menu-title {
   font-size: 17px;
   color: #ffb347;
   letter-spacing: 0.5px;
+}
+
+.menu-hide-btn {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #9a90b8;
+  cursor: pointer;
+}
+
+.menu-hide-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e8e3f0;
+}
+
+.menu-show-btn {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 170, 85, 0.3);
+  border-radius: 10px;
+  background: rgba(15, 12, 26, 0.88);
+  color: #ffb347;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+}
+
+.menu-show-btn:hover {
+  background: rgba(255, 170, 85, 0.15);
 }
 
 .menu-section h2 {

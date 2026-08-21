@@ -29,10 +29,19 @@ export default function AltarMenu({
   onRemovePhoto,
   clothColor,
   onClothColorChange,
+  onHide,
 }) {
   return (
     <aside className="menu">
-      <h1 className="menu-title">Altar de Muertos</h1>
+      <div className="menu-header">
+        <h1 className="menu-title">Altar de Muertos</h1>
+        <button className="menu-hide-btn" onClick={onHide} title="Ocultar menú" aria-label="Ocultar menú">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
 
       <section className="menu-section">
         <h2>Agregar objeto</h2>
