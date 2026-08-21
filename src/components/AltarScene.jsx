@@ -49,11 +49,11 @@ function Room() {
         <meshStandardMaterial {...wallMat} />
       </mesh>
       {/* Paredes laterales cortas */}
-      <mesh ref={leftRef} position={[-5.9, 4, -2.5]} receiveShadow>
+      <mesh ref={leftRef} position={[-5.9, 40, -2.5]} receiveShadow>
         <boxGeometry args={[0.2, 8, 3]} />
         <meshStandardMaterial {...wallMat} />
       </mesh>
-      <mesh ref={rightRef} position={[5.9, 4, -2.5]} receiveShadow>
+      <mesh ref={rightRef} position={[5.9, 40, -2.5]} receiveShadow>
         <boxGeometry args={[0.2, 8, 3]} />
         <meshStandardMaterial {...wallMat} />
       </mesh>
@@ -135,10 +135,13 @@ function buildClothGeometry() {
   return geo
 }
 
-/** Grada de 3 niveles cubierta por tela blanca: referencia visual, no restringe la colocación. */
-function AltarSteps() {
+const DEFAULT_CLOTH_COLOR = '#f7f2e8'
+
+/** Grada de 3 niveles cubierta por el mantel: referencia visual, no restringe la colocación. */
+function AltarSteps({ clothColor }) {
+  clothColor ||= DEFAULT_CLOTH_COLOR
   const clothGeo = useMemo(() => buildClothGeometry(), [])
-  // Núcleo en tono hueso para que los costados descubiertos combinen con la tela
+  // Núcleo en tono hueso para que los costados descubiertos combinen con el mantel
   const stepMat = { color: '#e9e2d4', roughness: 0.9 }
   return (
     <group position={[0, 0, -2.2]}>
@@ -155,7 +158,7 @@ function AltarSteps() {
         <meshStandardMaterial {...stepMat} />
       </mesh>
       <mesh geometry={clothGeo} castShadow receiveShadow>
-        <meshStandardMaterial color="#f7f2e8" roughness={0.82} side={THREE.DoubleSide} />
+        <meshStandardMaterial color={clothColor} roughness={0.82} side={THREE.DoubleSide} />
       </mesh>
     </group>
   )
@@ -274,6 +277,7 @@ export default function AltarScene({
   focusRef,
   autoOrbit = false,
   messages = [],
+  clothColor,
 }) {
   const orbitRef = useRef()
 
@@ -297,7 +301,7 @@ export default function AltarScene({
 
       <CeremonialLights />
       <Room />
-      <AltarSteps />
+      <AltarSteps clothColor={clothColor} />
       <PhotoFrame photo={photo} />
       <CandleLights />
       <SoulField messages={messages} />

@@ -65,6 +65,7 @@ export default function AltarViewer({ slug }) {
       <Canvas shadows camera={{ position: [0, 3.2, 5.5], fov: 50 }}>
         <AltarScene
           photo={data.photo}
+          clothColor={data.clothColor}
           objects={data.objects}
           selectedId={null}
           mode="translate"

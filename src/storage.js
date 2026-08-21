@@ -3,7 +3,7 @@
 // (mismo contrato: un JSON con objects + photo bajo un slug corto).
 const SHARED_PREFIX = 'altar-shared-v1:'
 
-export function saveSharedAltar({ objects, photo, name }) {
+export function saveSharedAltar({ objects, photo, name, clothColor }) {
   const slug = Math.random().toString(36).slice(2, 7)
   const payload = {
     slug,
@@ -11,6 +11,7 @@ export function saveSharedAltar({ objects, photo, name }) {
     createdAt: new Date().toISOString(),
     objects,
     photo: photo ?? null,
+    clothColor: clothColor ?? null,
   }
   localStorage.setItem(SHARED_PREFIX + slug, JSON.stringify(payload))
   return slug

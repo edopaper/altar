@@ -27,6 +27,8 @@ export default function AltarMenu({
   hasPhoto,
   onUploadPhoto,
   onRemovePhoto,
+  clothColor,
+  onClothColorChange,
 }) {
   return (
     <aside className="menu">
@@ -95,6 +97,14 @@ export default function AltarMenu({
           )}
         </div>
         <div className="menu-note">Máx. 5 MB · se ajusta a 512 px conservando proporción</div>
+      </section>
+
+      <section className="menu-section">
+        <h2>Mantel</h2>
+        <label className="color-row">
+          Color
+          <input type="color" value={clothColor} onChange={(e) => onClothColorChange(e.target.value)} />
+        </label>
       </section>
 
       <section className="menu-section">

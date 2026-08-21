@@ -16,6 +16,8 @@ const SHAPE_LABELS = { cube: 'Cubo', sphere: 'Esfera', cone: 'Prisma' }
 
 const STORAGE_KEY = 'altar-objects-v1'
 const PHOTO_KEY = 'altar-photo-v1'
+const CLOTH_COLOR_KEY = 'altar-cloth-color-v1'
+const DEFAULT_CLOTH_COLOR = '#f7f2e8'
 const PHOTO_MAX_BYTES = 5 * 1024 * 1024 // 5 MB
 const PHOTO_SIZE = 512
 
@@ -96,6 +98,13 @@ function AltarEditor() {
 
   const [photo, setPhoto] = useState(() => localStorage.getItem(PHOTO_KEY))
 
+  const [clothColor, setClothColor] = useState(
+    () => localStorage.getItem(CLOTH_COLOR_KEY) || DEFAULT_CLOTH_COLOR,
+  )
+  useEffect(() => {
+    localStorage.setItem(CLOTH_COLOR_KEY, clothColor)
+  }, [clothColor])
+
   const uploadPhoto = async (file) => {
     if (!file) return
     if (!file.type.startsWith('image/')) {
@@ -122,7 +131,7 @@ function AltarEditor() {
 
   // Publica un snapshot del altar bajo un slug y copia el enlace del visor.
   const shareAltar = () => {
-    const slug = saveSharedAltar({ objects, photo })
+    const slug = saveSharedAltar({ objects, photo, clothColor })
     const url = `${window.location.origin}${window.location.pathname}#/ver/${slug}`
     navigator.clipboard?.writeText(url).catch(() => {})
     window.alert(`Enlace del altar (copiado al portapapeles):\n${url}`)
@@ -260,6 +269,7 @@ function AltarEditor() {
       >
         <AltarScene
           photo={photo}
+          clothColor={clothColor}
           objects={objects}
           selectedId={selectedId}
           mode={mode}
@@ -291,6 +301,8 @@ function AltarEditor() {
         hasPhoto={!!photo}
         onUploadPhoto={uploadPhoto}
         onRemovePhoto={removePhoto}
+        clothColor={clothColor}
+        onClothColorChange={setClothColor}
         mode={mode}
         onModeChange={setMode}
       />
