@@ -1,15 +1,41 @@
 import { useEffect, useMemo, useRef } from 'react'
+import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { OrbitControls } from '@react-three/drei'
 import AltarObject from './AltarObject.jsx'
 import PhotoFrame from './PhotoFrame.jsx'
 import CandleLights from './CandleLights.jsx'
+import SoulField from './SoulField.jsx'
 
 const ALTAR_CENTER = new THREE.Vector3(0, 1, -2.2)
 
+// Umbral (con margen hacia el interior) a partir del cual cada pared empieza
+// a desvanecerse: la cámara la "toca" antes de llegar a su superficie real,
+// para que el desvanecimiento termine justo cuando cruzaría la pared.
+const BACK_WALL_Z = -3.7
+const SIDE_WALL_X = 5.5
+const FADE_SPEED = 0.15 // suavizado por frame, no es instantáneo
+
 /** Habitación: piso, pared trasera y dos paredes laterales cortas, sin techo. */
 function Room() {
-  const wallMat = { color: '#8d7ba8', roughness: 0.95 }
+  const wallMat = { color: '#8d7ba8', roughness: 0.95, transparent: true }
+  const backRef = useRef()
+  const leftRef = useRef()
+  const rightRef = useRef()
+
+  // Cada pared se desvanece cuando la cámara la atraviesa u orbita más allá
+  // de ella, para que nunca bloquee la vista desde el otro lado.
+  useFrame(({ camera }) => {
+    const fade = (mesh, visible) => {
+      const mat = mesh.current?.material
+      if (!mat) return
+      mat.opacity = THREE.MathUtils.lerp(mat.opacity, visible ? 1 : 0, FADE_SPEED)
+    }
+    fade(backRef, camera.position.z > BACK_WALL_Z)
+    fade(leftRef, camera.position.x > -SIDE_WALL_X)
+    fade(rightRef, camera.position.x < SIDE_WALL_X)
+  })
+
   return (
     <group>
       {/* Piso */}
@@ -18,17 +44,17 @@ function Room() {
         <meshStandardMaterial color="#7a6a94" roughness={1} />
       </mesh>
       {/* Pared trasera */}
-      <mesh position={[0, 2, -4]} receiveShadow>
-        <boxGeometry args={[12, 4, 0.2]} />
+      <mesh ref={backRef} position={[0, 4, -4]} receiveShadow>
+        <boxGeometry args={[12, 8, 0.2]} />
         <meshStandardMaterial {...wallMat} />
       </mesh>
       {/* Paredes laterales cortas */}
-      <mesh position={[-5.9, 2, -2.5]} receiveShadow>
-        <boxGeometry args={[0.2, 4, 3]} />
+      <mesh ref={leftRef} position={[-5.9, 4, -2.5]} receiveShadow>
+        <boxGeometry args={[0.2, 8, 3]} />
         <meshStandardMaterial {...wallMat} />
       </mesh>
-      <mesh position={[5.9, 2, -2.5]} receiveShadow>
-        <boxGeometry args={[0.2, 4, 3]} />
+      <mesh ref={rightRef} position={[5.9, 4, -2.5]} receiveShadow>
+        <boxGeometry args={[0.2, 8, 3]} />
         <meshStandardMaterial {...wallMat} />
       </mesh>
     </group>
@@ -183,7 +209,72 @@ function CeremonialLights() {
   )
 }
 
-export default function AltarScene({ photo, objects, selectedId, mode, snap, onSelect, onTransform, focusRef }) {
+// Órbita automática del visor: sin actividad, la cámara oscila lentamente
+// como péndulo alrededor del altar, sin pasar de ±45° (nunca ve las paredes
+// por detrás). Cualquier interacción la pausa unos segundos.
+const ORBIT_LIMIT = Math.PI / 4
+const ORBIT_SPEED = 0.55 // autoRotateSpeed: lento, cozy
+const IDLE_DELAY_MS = 4000
+
+function IdleOrbit({ orbitRef }) {
+  const idleRef = useRef(true)
+  const speedRef = useRef(ORBIT_SPEED)
+
+  useEffect(() => {
+    let timer
+    const wake = () => {
+      idleRef.current = false
+      clearTimeout(timer)
+      timer = setTimeout(() => {
+        idleRef.current = true
+      }, IDLE_DELAY_MS)
+    }
+    window.addEventListener('pointerdown', wake)
+    window.addEventListener('wheel', wake, { passive: true })
+    window.addEventListener('touchstart', wake, { passive: true })
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('pointerdown', wake)
+      window.removeEventListener('wheel', wake)
+      window.removeEventListener('touchstart', wake)
+    }
+  }, [])
+
+  useFrame((_, delta) => {
+    const controls = orbitRef.current
+    if (!controls) return
+    if (import.meta.env.DEV)
+      window.__orbitDebug = { azimuth: controls.getAzimuthalAngle(), idle: idleRef.current }
+    if (!idleRef.current) {
+      controls.autoRotate = false
+      return
+    }
+    // Péndulo: al llegar al límite de azimut invierte el sentido.
+    // autoRotateSpeed positivo disminuye el azimut; negativo lo aumenta.
+    const azimuth = controls.getAzimuthalAngle()
+    if (azimuth >= ORBIT_LIMIT) speedRef.current = ORBIT_SPEED
+    else if (azimuth <= -ORBIT_LIMIT) speedRef.current = -ORBIT_SPEED
+    controls.autoRotate = true
+    // autoRotate avanza un paso fijo POR FRAME; se normaliza con el delta
+    // real para que la velocidad sea la misma a 30, 60 o 120 fps.
+    controls.autoRotateSpeed = speedRef.current * Math.min(delta, 0.1) * 60
+  })
+
+  return null
+}
+
+export default function AltarScene({
+  photo,
+  objects,
+  selectedId,
+  mode,
+  snap,
+  onSelect,
+  onTransform,
+  focusRef,
+  autoOrbit = false,
+  messages = [],
+}) {
   const orbitRef = useRef()
 
   // Expone a la UI una función para centrar la cámara en una posición.
@@ -209,6 +300,7 @@ export default function AltarScene({ photo, objects, selectedId, mode, snap, onS
       <AltarSteps />
       <PhotoFrame photo={photo} />
       <CandleLights />
+      <SoulField messages={messages} />
 
       {objects.map((obj) => (
         <AltarObject
@@ -222,6 +314,8 @@ export default function AltarScene({ photo, objects, selectedId, mode, snap, onS
           orbitRef={orbitRef}
         />
       ))}
+
+      {autoOrbit && <IdleOrbit orbitRef={orbitRef} />}
 
       <OrbitControls
         ref={orbitRef}
