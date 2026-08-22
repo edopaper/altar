@@ -18,11 +18,11 @@ un altar ya publicado. Vamos paso a paso.
 - [x] Dejar la lista en un archivo separado fácil de editar.
 
 ## 3. Botón de reporte en el altar compartido
-- [ ] Columna `reported_count` (int, default 0) en `altars`.
-- [ ] Nueva Edge Function (o endpoint) `report-altar` que reciba `slug` e
+- [x] Columna `reported_count` (int, default 0) en `altars`.
+- [x] Nueva Edge Function (o endpoint) `report-altar` que reciba `slug` e
       incremente `reported_count` (con su propio rate limit por IP para
       evitar spam de reportes).
-- [ ] Botón "Reportar" en `AltarViewer.jsx`, con confirmación simple.
+- [x] Botón "Reportar" en `AltarViewer.jsx`, con confirmación simple.
 
 ## 4. Ocultamiento automático + revisión
 - [ ] Columna `status` (`visible` / `hidden`) en `altars`, default `visible`.

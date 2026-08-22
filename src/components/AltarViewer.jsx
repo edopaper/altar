@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import AltarScene from './AltarScene.jsx'
 import MusicPlayer from './MusicPlayer.jsx'
-import { loadSharedAltar } from '../storage.js'
+import { loadSharedAltar, reportAltar } from '../storage.js'
 import { loadMessages } from '../messages.js'
 import MessageForm from './MessageForm.jsx'
 
@@ -47,6 +47,7 @@ export default function AltarViewer({ slug }) {
   const [status, setStatus] = useState('loading') // 'loading' | 'ready' | 'missing' | 'error'
   const [messages, setMessages] = useState([])
   const [showMessageForm, setShowMessageForm] = useState(false)
+  const [reportState, setReportState] = useState('idle') // 'idle' | 'sending' | 'sent' | 'error'
 
   useEffect(() => {
     let cancelled = false
@@ -72,6 +73,19 @@ export default function AltarViewer({ slug }) {
       cancelled = true
     }
   }, [slug])
+
+  const handleReport = () => {
+    if (reportState === 'sending' || reportState === 'sent') return
+    const confirmed = window.confirm(
+      '¿Reportar este altar por contenido inapropiado? Un equipo lo va a revisar.'
+    )
+    if (!confirmed) return
+
+    setReportState('sending')
+    reportAltar(slug)
+      .then(() => setReportState('sent'))
+      .catch(() => setReportState('error'))
+  }
 
   if (status === 'loading') {
     return (
@@ -132,7 +146,18 @@ export default function AltarViewer({ slug }) {
           <a className="btn" href="#/">
             Crear mi propio altar
           </a>
+          <button
+            className="btn viewer-report-btn"
+            onClick={handleReport}
+            disabled={reportState === 'sending' || reportState === 'sent'}
+            title="Reportar este altar por contenido inapropiado"
+          >
+            {reportState === 'sent' ? 'Reportado' : 'Reportar'}
+          </button>
         </div>
+        {reportState === 'error' && (
+          <div className="viewer-report-error">No se pudo enviar el reporte. Probá de nuevo.</div>
+        )}
         <MusicPlayer />
       </div>
 

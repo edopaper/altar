@@ -25,6 +25,25 @@ export async function saveSharedAltar({ objects, photo, name, clothColor }) {
   return data
 }
 
+export async function reportAltar(slug) {
+  const { data, error } = await supabase.functions.invoke('report-altar', {
+    body: { slug },
+  })
+
+  if (error) {
+    let message = 'No se pudo reportar el altar.'
+    try {
+      const body = await error.context?.json()
+      if (body?.error) message = body.error
+    } catch {
+      // Sin body legible (ej. error de red): se usa el mensaje genérico.
+    }
+    throw new Error(message)
+  }
+
+  return data
+}
+
 export async function loadSharedAltar(slug) {
   const { data, error } = await supabase
     .from('altars')
