@@ -63,21 +63,6 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
   const ip = getClientIp(req);
-  const since = new Date(Date.now() - WINDOW_MS).toISOString();
-
-  const { count, error: countError } = await supabase
-    .from("message_rate_limits")
-    .select("id", { count: "exact", head: true })
-    .eq("ip", ip)
-    .gte("created_at", since);
-
-  if (countError) {
-    return json({ error: "No se pudo verificar el límite de uso." }, 500);
-  }
-
-  if ((count ?? 0) >= RATE_LIMIT) {
-    return json({ error: "Alcanzaste el límite de mensajes por hora. Probá más tarde." }, 429);
-  }
 
   const { data: altar, error: fetchError } = await supabase
     .from("altars")
@@ -89,6 +74,21 @@ Deno.serve(async (req) => {
     return json({ error: "El altar no existe." }, 404);
   }
 
+  // Cuenta + reserva el slot en una sola sentencia atómica (evita que
+  // pedidos muy seguidos se pisen).
+  const { data: allowed, error: slotError } = await supabase.rpc("take_message_rate_limit_slot", {
+    p_ip: ip,
+    p_window_seconds: WINDOW_MS / 1000,
+    p_limit: RATE_LIMIT,
+  });
+
+  if (slotError) {
+    return json({ error: "No se pudo verificar el límite de uso." }, 500);
+  }
+  if (!allowed) {
+    return json({ error: "Alcanzaste el límite de mensajes por hora. Probá más tarde." }, 429);
+  }
+
   const { data: message, error: insertError } = await supabase
     .from("messages")
     .insert({ slug, text, author: cleanAuthor })
@@ -98,8 +98,6 @@ Deno.serve(async (req) => {
   if (insertError || !message) {
     return json({ error: "No se pudo guardar el mensaje." }, 500);
   }
-
-  await supabase.from("message_rate_limits").insert({ ip });
 
   return json({ message });
 });

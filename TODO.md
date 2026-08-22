@@ -77,3 +77,9 @@ un altar ya publicado. Vamos paso a paso.
 - [x] Compartir de nuevo el mismo altar actualiza la misma fila en vez de
       crear una nueva cada vez (bug reportado: cada "Compartir" insertaba
       un altar distinto).
+- [x] Rate limits atómicos (contar+insertar en una sola sentencia SQL) en
+      `share-altar`, `report-altar`, `add-message`, `report-message` — con
+      pedidos muy seguidos el select de uno no veía el insert del anterior
+      y se colaban de más.
+- [x] Límite propio (30/hora, más laxo) para la rama de "actualizar" un
+      altar ya compartido — antes no tenía ningún freno.

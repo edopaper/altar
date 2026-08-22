@@ -47,21 +47,6 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
   const ip = getClientIp(req);
-  const since = new Date(Date.now() - WINDOW_MS).toISOString();
-
-  const { count, error: countError } = await supabase
-    .from("message_report_rate_limits")
-    .select("id", { count: "exact", head: true })
-    .eq("ip", ip)
-    .gte("created_at", since);
-
-  if (countError) {
-    return json({ error: "No se pudo verificar el límite de uso." }, 500);
-  }
-
-  if ((count ?? 0) >= RATE_LIMIT) {
-    return json({ error: "Alcanzaste el límite de reportes por hora. Probá más tarde." }, 429);
-  }
 
   const { data: message, error: fetchError } = await supabase
     .from("messages")
@@ -73,14 +58,21 @@ Deno.serve(async (req) => {
     return json({ error: "El mensaje no existe." }, 404);
   }
 
-  const { error: markError } = await supabase
-    .from("message_report_rate_limits")
-    .insert({ ip, message_id: messageId });
-  if (markError) {
-    if (markError.code === "23505") {
-      return json({ error: "Ya reportaste este mensaje." }, 409);
-    }
-    return json({ error: "No se pudo registrar el reporte." }, 500);
+  // Cuenta + reserva el slot + marca (ip, message_id) en una sola sentencia
+  // atómica (evita que pedidos muy seguidos se pisen).
+  const { data: slotResult, error: slotError } = await supabase.rpc(
+    "take_message_report_rate_limit_slot",
+    { p_ip: ip, p_message_id: messageId, p_window_seconds: WINDOW_MS / 1000, p_limit: RATE_LIMIT },
+  );
+
+  if (slotError || !slotResult) {
+    return json({ error: "No se pudo verificar el límite de uso." }, 500);
+  }
+  if (slotResult === "rate_limited") {
+    return json({ error: "Alcanzaste el límite de reportes por hora. Probá más tarde." }, 429);
+  }
+  if (slotResult === "duplicate") {
+    return json({ error: "Ya reportaste este mensaje." }, 409);
   }
 
   const { data: result, error: incrementError } = await supabase

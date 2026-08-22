@@ -12,6 +12,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { containsForbiddenWord } from "../_shared/forbidden-words.ts";
 
 const RATE_LIMIT = 5; // altares nuevos por IP
+const UPDATE_RATE_LIMIT = 30; // actualizaciones (mismo altar) por IP, más laxo
 const WINDOW_MS = 60 * 60 * 1000; // 1 hora
 const MAX_OBJECTS = 150;
 const PHOTO_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -140,6 +141,23 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Límite propio para actualizaciones (más laxo que el de creación): sin
+    // esto, un loop descontrolado podría pegarle sin freno a esta rama.
+    const updateIp = getClientIp(req);
+    const { data: updateAllowed, error: updateSlotError } = await supabase.rpc(
+      "take_share_update_rate_limit_slot",
+      { p_ip: updateIp, p_window_seconds: WINDOW_MS / 1000, p_limit: UPDATE_RATE_LIMIT },
+    );
+    if (updateSlotError) {
+      return json({ error: "No se pudo verificar el límite de uso." }, 500);
+    }
+    if (!updateAllowed) {
+      return json(
+        { error: `Límite de ${UPDATE_RATE_LIMIT} actualizaciones por hora alcanzado. Probá de nuevo más tarde.` },
+        429,
+      );
+    }
+
     let photoUrl: string | null;
     try {
       photoUrl = await uploadPhoto(requestedSlug, true);
@@ -166,23 +184,23 @@ Deno.serve(async (req) => {
 
   // --- Crear un altar nuevo.
   const ip = getClientIp(req);
-  const since = new Date(Date.now() - WINDOW_MS).toISOString();
 
-  const { data: recent, error: countError } = await supabase
-    .from("share_rate_limits")
-    .select("created_at")
-    .eq("ip", ip)
-    .gte("created_at", since)
-    .order("created_at", { ascending: true });
+  // Cuenta + reserva el slot en una sola sentencia atómica (evita que
+  // pedidos muy seguidos se pisen y dejen pasar más de RATE_LIMIT por IP).
+  const { data: slot, error: slotError } = await supabase
+    .rpc("take_share_rate_limit_slot", {
+      p_ip: ip,
+      p_window_seconds: WINDOW_MS / 1000,
+      p_limit: RATE_LIMIT,
+    })
+    .single();
 
-  if (countError) {
+  if (slotError || !slot) {
     return json({ error: "No se pudo verificar el límite de uso." }, 500);
   }
 
-  const count = recent?.length ?? 0;
-  if (count >= RATE_LIMIT) {
-    const oldest = new Date(recent[0].created_at).getTime();
-    const retryAfterMinutes = Math.max(1, Math.ceil((oldest + WINDOW_MS - Date.now()) / 60000));
+  if (!slot.allowed) {
+    const retryAfterMinutes = Math.max(1, Math.ceil(slot.retry_after_seconds / 60));
     return json(
       {
         error: `Límite de ${RATE_LIMIT} altares compartidos por hora alcanzado. Probá de nuevo en ${retryAfterMinutes} min.`,
@@ -216,9 +234,7 @@ Deno.serve(async (req) => {
     });
 
     if (!insertError) {
-      await supabase.from("share_rate_limits").insert({ ip });
-      const remaining = Math.max(0, RATE_LIMIT - (count + 1));
-      return json({ slug, editToken: newEditToken, remaining, limit: RATE_LIMIT });
+      return json({ slug, editToken: newEditToken, remaining: slot.remaining, limit: RATE_LIMIT });
     }
 
     if (insertError.code !== "23505") {
