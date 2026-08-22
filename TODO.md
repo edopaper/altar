@@ -1,61 +1,37 @@
-# TODO — Migrar "Compartir altar" a Supabase
+# TODO — Sistema de moderación de contenido
 
-Contexto: hoy `shareAltar` (App.jsx) llama a `saveSharedAltar` (storage.js), que
-guarda el altar en `localStorage`. El link que se copia solo funciona en el
-mismo navegador donde se creó — no sirve para compartir de verdad. Este es el
-problema a resolver. Sin login: crear y ver altares queda público y anónimo,
-como hoy.
+Contexto: hoy compartir un altar (`share-altar` Edge Function) solo valida
+rate limit por IP, tamaño de objetos y tamaño de foto. No hay ningún filtro
+de contenido (nombre libre, foto libre) ni forma de reportar o dar de baja
+un altar ya publicado. Vamos paso a paso.
 
-## 1. Setup de Supabase
-- [x] Crear proyecto en Supabase.
-- [x] Guardar `SUPABASE_URL` y `SUPABASE_ANON_KEY` en `.env` (y `.env.example`
-      sin valores reales).
-- [x] Instalar `@supabase/supabase-js`.
-- [x] Crear `src/supabaseClient.js` con el cliente inicializado.
+## 1. Validar que la foto sea una imagen real
+- [x] En `share-altar/index.ts`, chequear los magic bytes del archivo
+      decodificado (no confiar solo en el `content-type` del data URL) antes
+      de subirlo a Storage.
+- [x] Rechazar (400) si no matchea la firma de PNG/JPG.
 
-## 2. Tabla `altars`
-- [x] Columnas: `slug` (text, PK), `name`, `objects` (jsonb), `photo_url`
-      (text, nullable), `cloth_color`, `created_at` (default now()).
-- [x] RLS activado:
-  - `insert`: público (anon) permitido.
-  - `select`: público (anon) permitido, solo lectura.
-  - Sin `update`/`delete` para anon (un altar compartido no se debería poder
-    pisar desde el link de otra persona).
-- [x] Índice único en `slug` (PK ya lo cubre).
+## 2. Filtro de palabras prohibidas en `name`
+- [x] Armar una lista básica de términos prohibidos (ES, extensible).
+- [x] Validar `name` en `share-altar/index.ts` antes del insert; si matchea,
+      devolver 400 con mensaje claro.
+- [x] Dejar la lista en un archivo separado fácil de editar.
 
-## 3. Fotos a Supabase Storage (en vez de base64 en la fila)
-- [x] Crear bucket público `altar-photos`.
-- [x] Al compartir: si hay `photo` (data URL en memoria), subirla al bucket
-      con el `slug` como nombre de archivo, guardar la URL pública en
-      `photo_url`.
-- [x] El editor local (autoguardado) sigue igual, en `localStorage` — esto
-      solo aplica al momento de compartir.
+## 3. Botón de reporte en el altar compartido
+- [ ] Columna `reported_count` (int, default 0) en `altars`.
+- [ ] Nueva Edge Function (o endpoint) `report-altar` que reciba `slug` e
+      incremente `reported_count` (con su propio rate limit por IP para
+      evitar spam de reportes).
+- [ ] Botón "Reportar" en `AltarViewer.jsx`, con confirmación simple.
 
-## 4. Reemplazar storage.js
-- [x] `saveSharedAltar` → `insert` en `altars` + subida de foto si aplica.
-- [x] `loadSharedAltar` → `select` por `slug` en vez de leer `localStorage`.
-- [x] Mantener la misma firma/contrato para no tocar `App.jsx` /
-      `AltarViewer.jsx` más de lo necesario (ahora async, mismo shape de
-      datos).
-- [x] Manejar estados de carga/error en `AltarViewer` (loading/missing/error).
-
-## 5. Guardarraíles (sin login, sin control por IP)
-- [x] Límite de tamaño en `objects` (ya existe MAX_OBJECTS = 150 en App.jsx,
-      revisar que el jsonb resultante sea razonable).
-- [x] Confirmar límite de foto (5 MB) sigue teniendo sentido subiendo a
-      Storage en vez de inline.
-- [ ] (Opcional, solo si hay abuso real) Rate limit por IP vía Edge Function.
-- [ ] (Opcional) Job/expiración: borrar altares no vistos en X días para no
-      crecer sin límite.
-
-## 6. Pruebas
-- [x] Compartir un altar desde un navegador, abrirlo en otro dispositivo/
-      navegador distinto y confirmar que carga.
-- [x] Confirmar que un slug inexistente muestra el estado "no encontrado" ya
-      existente en AltarViewer.
-- [x] Confirmar que la foto se ve correctamente vía `photo_url`.
+## 4. Ocultamiento automático + revisión
+- [ ] Columna `status` (`visible` / `hidden`) en `altars`, default `visible`.
+- [ ] Si `reported_count` supera un umbral (a definir), marcar `hidden`
+      automáticamente.
+- [ ] `AltarViewer` respeta `status = hidden` (muestra "no disponible").
+- [ ] Vista o función simple (protegida, no anon) para listar altares
+      ocultos/reportados y poder revisarlos manualmente.
 
 ## Fuera de alcance (por ahora)
-- Login / cuentas de usuario.
-- "Mis altares" / edición de un altar ya compartido.
-- Rate limiting proactivo (solo si se vuelve necesario).
+- Moderación de imágenes vía API externa (modelo de visión).
+- Login / cuentas de usuario / panel admin completo.

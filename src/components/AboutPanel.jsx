@@ -14,7 +14,7 @@ export default function AboutPanel({ onClose }) {
             Kenney (kenney.nl)
           </a>.
         </p>
-        <p className="about-credit">@edopaper</p>
+        <p className="about-credit">Made by @edopaper</p>
         <div className="shape-row message-actions">
           <button className="btn btn--block" onClick={onClose}>
             Cerrar

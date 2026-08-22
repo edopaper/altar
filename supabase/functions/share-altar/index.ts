@@ -2,6 +2,7 @@
 // por IP, sube la foto (si hay) y hace el insert en `altars`, todo con la
 // service role key (el cliente ya no tiene permiso de insert directo).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { containsForbiddenWord } from "./forbidden-words.ts";
 
 const RATE_LIMIT = 5; // altares por IP
 const WINDOW_MS = 60 * 60 * 1000; // 1 hora
@@ -38,6 +39,28 @@ function decodeDataUrl(dataUrl: string): { bytes: Uint8Array; contentType: strin
   return { bytes, contentType: match[1] };
 }
 
+// Detecta el formato real de la imagen a partir de sus primeros bytes
+// (magic numbers), sin confiar en el content-type declarado por el cliente.
+function sniffImageType(bytes: Uint8Array): "image/png" | "image/jpeg" | null {
+  if (
+    bytes.length >= 8 &&
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47 &&
+    bytes[4] === 0x0d &&
+    bytes[5] === 0x0a &&
+    bytes[6] === 0x1a &&
+    bytes[7] === 0x0a
+  ) {
+    return "image/png";
+  }
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return "image/jpeg";
+  }
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -56,6 +79,9 @@ Deno.serve(async (req) => {
   }
   if (photo !== undefined && photo !== null && typeof photo !== "string") {
     return json({ error: "Foto inválida." }, 400);
+  }
+  if (typeof name === "string" && containsForbiddenWord(name)) {
+    return json({ error: "El nombre del altar contiene una palabra no permitida." }, 400);
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -102,11 +128,15 @@ Deno.serve(async (req) => {
       if (decoded.bytes.byteLength > PHOTO_MAX_BYTES) {
         return json({ error: "La foto supera el máximo permitido (5 MB)." }, 400);
       }
-      const ext = decoded.contentType === "image/png" ? "png" : "jpg";
+      const realType = sniffImageType(decoded.bytes);
+      if (!realType) {
+        return json({ error: "La foto debe ser una imagen PNG o JPG válida." }, 400);
+      }
+      const ext = realType === "image/png" ? "png" : "jpg";
       const path = `${slug}.${ext}`;
       const { error: uploadError } = await supabase.storage
         .from("altar-photos")
-        .upload(path, decoded.bytes, { contentType: decoded.contentType, upsert: false });
+        .upload(path, decoded.bytes, { contentType: realType, upsert: false });
       if (uploadError) return json({ error: "No se pudo subir la foto." }, 500);
 
       const { data: publicUrlData } = supabase.storage.from("altar-photos").getPublicUrl(path);
