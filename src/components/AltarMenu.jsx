@@ -40,6 +40,7 @@ export default function AltarMenu({
   onToggleSnap,
   onClearAltar,
   onShare,
+  isSharing,
   onModeChange,
   hasPhoto,
   onUploadPhoto,
@@ -223,8 +224,12 @@ export default function AltarMenu({
           <input type="checkbox" checked={snap} onChange={onToggleSnap} />
           Snap a rejilla (0.1 u / 15°)
         </label>
-        <button className="btn btn--block" onClick={onShare} disabled={objects.length === 0 && !hasPhoto}>
-          Compartir altar
+        <button
+          className="btn btn--block"
+          onClick={onShare}
+          disabled={(objects.length === 0 && !hasPhoto) || isSharing}
+        >
+          {isSharing ? 'Compartiendo…' : 'Compartir altar'}
         </button>
         <button className="btn btn--danger btn--block" onClick={onClearAltar} disabled={objects.length === 0}>
           Limpiar altar

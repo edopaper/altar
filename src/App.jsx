@@ -112,6 +112,7 @@ function AltarEditor() {
   }, [objects])
 
   const [photo, setPhoto] = useState(() => localStorage.getItem(PHOTO_KEY))
+  const [isSharing, setIsSharing] = useState(false)
 
   const [clothColor, setClothColor] = useState(
     () => localStorage.getItem(CLOTH_COLOR_KEY) || DEFAULT_CLOTH_COLOR,
@@ -145,11 +146,19 @@ function AltarEditor() {
   }
 
   // Publica un snapshot del altar bajo un slug y copia el enlace del visor.
-  const shareAltar = () => {
-    const slug = saveSharedAltar({ objects, photo, clothColor })
-    const url = `${window.location.origin}${window.location.pathname}#/ver/${slug}`
-    navigator.clipboard?.writeText(url).catch(() => {})
-    window.alert(`Enlace del altar (copiado al portapapeles):\n${url}`)
+  const shareAltar = async () => {
+    if (isSharing) return
+    setIsSharing(true)
+    try {
+      const slug = await saveSharedAltar({ objects, photo, clothColor })
+      const url = `${window.location.origin}${window.location.pathname}#/ver/${slug}`
+      navigator.clipboard?.writeText(url).catch(() => {})
+      window.alert(`Enlace del altar (copiado al portapapeles):\n${url}`)
+    } catch {
+      window.alert('No se pudo compartir el altar. Probá de nuevo en un momento.')
+    } finally {
+      setIsSharing(false)
+    }
   }
 
   // Captura la escena como PNG: deselecciona (para que no salga el gizmo),
@@ -344,6 +353,7 @@ function AltarEditor() {
         onToggleSnap={() => setSnap((s) => !s)}
         onClearAltar={clearAltar}
         onShare={shareAltar}
+        isSharing={isSharing}
         hasPhoto={!!photo}
         onUploadPhoto={uploadPhoto}
         onRemovePhoto={removePhoto}

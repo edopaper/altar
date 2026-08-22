@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import AltarScene from './AltarScene.jsx'
 import MusicPlayer from './MusicPlayer.jsx'
@@ -41,18 +41,63 @@ function useIdle(delayMs) {
  * actividad, la cámara orbita sola y la interfaz se oculta.
  */
 export default function AltarViewer({ slug }) {
-  const data = useMemo(() => loadSharedAltar(slug), [slug])
   const focusRef = useRef(null)
   const idle = useIdle(IDLE_DELAY_MS)
-  // Lectura en un único batch de todos los mensajes ligados a este altar.
-  const [messages, setMessages] = useState(() => (data ? loadMessages(slug) : []))
+  const [data, setData] = useState(null)
+  const [status, setStatus] = useState('loading') // 'loading' | 'ready' | 'missing' | 'error'
+  const [messages, setMessages] = useState([])
   const [showMessageForm, setShowMessageForm] = useState(false)
 
-  if (!data) {
+  useEffect(() => {
+    let cancelled = false
+    setStatus('loading')
+    setData(null)
+
+    loadSharedAltar(slug)
+      .then((altar) => {
+        if (cancelled) return
+        if (!altar) {
+          setStatus('missing')
+          return
+        }
+        setData(altar)
+        setMessages(loadMessages(slug))
+        setStatus('ready')
+      })
+      .catch(() => {
+        if (!cancelled) setStatus('error')
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [slug])
+
+  if (status === 'loading') {
+    return (
+      <div className="viewer-missing">
+        <h1>Cargando altar…</h1>
+      </div>
+    )
+  }
+
+  if (status === 'error') {
+    return (
+      <div className="viewer-missing">
+        <h1>No se pudo cargar el altar</h1>
+        <p>Hubo un problema de conexión. Probá recargar la página.</p>
+        <a className="btn viewer-missing-btn" href="#/">
+          Crear mi propio altar
+        </a>
+      </div>
+    )
+  }
+
+  if (status === 'missing' || !data) {
     return (
       <div className="viewer-missing">
         <h1>Altar no encontrado</h1>
-        <p>El enlace no existe o ya no está disponible en este navegador.</p>
+        <p>El enlace no existe o ya no está disponible.</p>
         <a className="btn viewer-missing-btn" href="#/">
           Crear mi propio altar
         </a>
