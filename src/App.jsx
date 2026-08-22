@@ -7,6 +7,7 @@ import MusicPlayer from './components/MusicPlayer.jsx'
 import AltarViewer from './components/AltarViewer.jsx'
 import ThumbnailStage from './components/ThumbnailStage.jsx'
 import AboutPanel from './components/AboutPanel.jsx'
+import Toast from './components/Toast.jsx'
 import { saveSharedAltar } from './storage.js'
 import { MODEL_CATEGORIES, MODEL_LIST } from './models.js'
 import { PAPER_LIST } from './papel.js'
@@ -41,6 +42,17 @@ async function processPhoto(file) {
   canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height)
   bitmap.close()
   return canvas.toDataURL('image/jpeg', 0.85)
+}
+
+// Intenta copiar al portapapeles; si el navegador lo bloquea (permiso,
+// contexto no seguro, etc.) devuelve false para que el caller lo indique.
+async function copyToClipboard(text) {
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    return false
+  }
 }
 
 // Restaura la escena guardada; descarta objetos cuyo .glb ya no exista en la
@@ -113,6 +125,19 @@ function AltarEditor() {
 
   const [photo, setPhoto] = useState(() => localStorage.getItem(PHOTO_KEY))
   const [isSharing, setIsSharing] = useState(false)
+  const [toast, setToast] = useState(null)
+  const toastTimerRef = useRef(null)
+  // Último altar compartido con éxito: si al tocar "Compartir" de nuevo el
+  // contenido es idéntico, se reusa el link ya generado en vez de volver a
+  // pegarle a la Edge Function (menos carga, y no gasta cupo del rate limit).
+  const lastSharedRef = useRef(null)
+
+  const showToast = useCallback((message, type = 'info', duration = 5000) => {
+    clearTimeout(toastTimerRef.current)
+    setToast({ message, type })
+    toastTimerRef.current = setTimeout(() => setToast(null), duration)
+  }, [])
+  useEffect(() => () => clearTimeout(toastTimerRef.current), [])
 
   const [clothColor, setClothColor] = useState(
     () => localStorage.getItem(CLOTH_COLOR_KEY) || DEFAULT_CLOTH_COLOR,
@@ -146,16 +171,41 @@ function AltarEditor() {
   }
 
   // Publica un snapshot del altar bajo un slug y copia el enlace del visor.
+  // Si el contenido es igual al del último share exitoso, no vuelve a llamar
+  // a la Edge Function: copia de nuevo el link ya existente.
   const shareAltar = async () => {
     if (isSharing) return
+
+    const shareKey = JSON.stringify({ objects, photo, clothColor })
+    const cached = lastSharedRef.current
+    if (cached && cached.key === shareKey) {
+      const copied = await copyToClipboard(cached.url)
+      showToast(
+        copied
+          ? 'Este altar ya estaba compartido. Enlace copiado de nuevo.'
+          : `Este altar ya estaba compartido:\n${cached.url}`,
+        'success',
+      )
+      return
+    }
+
     setIsSharing(true)
     try {
-      const slug = await saveSharedAltar({ objects, photo, clothColor })
+      const { slug, remaining, limit } = await saveSharedAltar({ objects, photo, clothColor })
       const url = `${window.location.origin}${window.location.pathname}#/ver/${slug}`
-      navigator.clipboard?.writeText(url).catch(() => {})
-      window.alert(`Enlace del altar (copiado al portapapeles):\n${url}`)
-    } catch {
-      window.alert('No se pudo compartir el altar. Probá de nuevo en un momento.')
+      lastSharedRef.current = { key: shareKey, url }
+
+      const copied = await copyToClipboard(url)
+      const limitNote =
+        typeof remaining === 'number' && typeof limit === 'number'
+          ? `\nTe quedan ${remaining} de ${limit} compartidos esta hora.`
+          : ''
+      showToast(
+        (copied ? 'Enlace copiado al portapapeles.' : `No se pudo copiar. Enlace:\n${url}`) + limitNote,
+        'success',
+      )
+    } catch (err) {
+      showToast(err?.message || 'No se pudo compartir el altar. Probá de nuevo en un momento.', 'error')
     } finally {
       setIsSharing(false)
     }
@@ -368,6 +418,8 @@ function AltarEditor() {
       )}
 
       {aboutOpen && <AboutPanel onClose={() => setAboutOpen(false)} />}
+
+      <Toast toast={toast} onClose={() => setToast(null)} />
 
       <TransformToolbar mode={mode} onModeChange={setMode} hasSelection={!!selected} />
       <MusicPlayer />

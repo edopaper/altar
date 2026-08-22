@@ -201,6 +201,57 @@ canvas {
   cursor: default;
 }
 
+/* ---------- Toast ---------- */
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: min(420px, calc(100% - 32px));
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: rgba(20, 16, 30, 0.96);
+  border: 1px solid rgba(255, 170, 85, 0.35);
+  color: #e8e3f0;
+  font-size: 13px;
+  line-height: 1.45;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.toast--success {
+  border-color: rgba(120, 220, 160, 0.5);
+}
+
+.toast--error {
+  border-color: rgba(255, 90, 90, 0.5);
+}
+
+.toast-message {
+  flex: 1;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.toast-close {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  opacity: 0.7;
+  padding: 0;
+}
+
+.toast-close:hover {
+  opacity: 1;
+}
+
 .menu-note {
   font-size: 10.5px;
   color: #6f6690;
