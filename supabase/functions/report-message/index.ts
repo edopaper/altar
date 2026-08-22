@@ -1,12 +1,12 @@
-// Edge Function: reportar un altar compartido. Incrementa `reported_count`
-// en `altars` usando la service role key (el cliente no tiene permiso de
-// update directo). Rate limit por IP + una IP no puede reportar el mismo
-// altar más de una vez.
+// Edge Function: reportar un mensaje puntual (distinto de reportar el
+// altar completo). Incrementa `reported_count` en `messages` con la service
+// role key. Rate limit por IP + una IP no puede reportar el mismo mensaje
+// más de una vez. Mismo patrón que report-altar.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const RATE_LIMIT = 20; // reportes por IP (en total, cualquier altar)
+const RATE_LIMIT = 30; // reportes de mensajes por IP (en total) por hora
 const WINDOW_MS = 60 * 60 * 1000; // 1 hora
-const HIDE_THRESHOLD = 5; // reportes acumulados para ocultar el altar automáticamente
+const HIDE_THRESHOLD = 3; // reportes acumulados para ocultar el mensaje
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -37,9 +37,9 @@ Deno.serve(async (req) => {
     return json({ error: "JSON inválido" }, 400);
   }
 
-  const { slug } = payload ?? {};
-  if (typeof slug !== "string" || !slug) {
-    return json({ error: "Falta el slug del altar." }, 400);
+  const { messageId } = payload ?? {};
+  if (typeof messageId !== "number" || !Number.isFinite(messageId)) {
+    return json({ error: "Falta el id del mensaje." }, 400);
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
   const since = new Date(Date.now() - WINDOW_MS).toISOString();
 
   const { count, error: countError } = await supabase
-    .from("report_rate_limits")
+    .from("message_report_rate_limits")
     .select("id", { count: "exact", head: true })
     .eq("ip", ip)
     .gte("created_at", since);
@@ -63,29 +63,28 @@ Deno.serve(async (req) => {
     return json({ error: "Alcanzaste el límite de reportes por hora. Probá más tarde." }, 429);
   }
 
-  const { data: altar, error: fetchError } = await supabase
-    .from("altars")
-    .select("slug")
-    .eq("slug", slug)
+  const { data: message, error: fetchError } = await supabase
+    .from("messages")
+    .select("id")
+    .eq("id", messageId)
     .maybeSingle();
 
-  if (fetchError || !altar) {
-    return json({ error: "El altar no existe." }, 404);
+  if (fetchError || !message) {
+    return json({ error: "El mensaje no existe." }, 404);
   }
 
-  const { error: markError } = await supabase.from("report_rate_limits").insert({ ip, slug });
+  const { error: markError } = await supabase
+    .from("message_report_rate_limits")
+    .insert({ ip, message_id: messageId });
   if (markError) {
-    // Índice único (ip, slug): ya lo había reportado antes.
     if (markError.code === "23505") {
-      return json({ error: "Ya reportaste este altar." }, 409);
+      return json({ error: "Ya reportaste este mensaje." }, 409);
     }
     return json({ error: "No se pudo registrar el reporte." }, 500);
   }
 
-  // Incremento atómico (una sola sentencia SQL): evita que reportes casi
-  // simultáneos se pisen entre sí y el conteo quede corto.
   const { data: result, error: incrementError } = await supabase
-    .rpc("increment_altar_report", { p_slug: slug, p_hide_threshold: HIDE_THRESHOLD })
+    .rpc("increment_message_report", { p_message_id: messageId, p_hide_threshold: HIDE_THRESHOLD })
     .single();
 
   if (incrementError || !result) {

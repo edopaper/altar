@@ -1,12 +1,14 @@
-// Edge Function: reportar un altar compartido. Incrementa `reported_count`
-// en `altars` usando la service role key (el cliente no tiene permiso de
-// update directo). Rate limit por IP + una IP no puede reportar el mismo
-// altar más de una vez.
+// Edge Function: único punto para dejar un mensaje en un altar compartido.
+// Valida longitud, palabras prohibidas y rate limit por IP, y hace el
+// insert con la service role key (el cliente no tiene permiso de insert
+// directo). Mismo patrón que `share-altar`.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { containsForbiddenWord } from "../_shared/forbidden-words.ts";
 
-const RATE_LIMIT = 20; // reportes por IP (en total, cualquier altar)
+const MAX_MESSAGE_LENGTH = 60;
+const MAX_NAME_LENGTH = 20;
+const RATE_LIMIT = 10; // mensajes por IP
 const WINDOW_MS = 60 * 60 * 1000; // 1 hora
-const HIDE_THRESHOLD = 5; // reportes acumulados para ocultar el altar automáticamente
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -37,10 +39,24 @@ Deno.serve(async (req) => {
     return json({ error: "JSON inválido" }, 400);
   }
 
-  const { slug } = payload ?? {};
+  const { slug, author } = payload ?? {};
+  const text = typeof payload?.text === "string" ? payload.text.trim().replace(/\s+/g, " ") : "";
+
   if (typeof slug !== "string" || !slug) {
     return json({ error: "Falta el slug del altar." }, 400);
   }
+  if (!text) {
+    return json({ error: "Escribí un mensaje." }, 400);
+  }
+  if (text.length > MAX_MESSAGE_LENGTH) {
+    return json({ error: `Máximo ${MAX_MESSAGE_LENGTH} caracteres.` }, 400);
+  }
+  if (containsForbiddenWord(text)) {
+    return json({ error: "Ese mensaje no se puede publicar." }, 400);
+  }
+
+  const rawAuthor = typeof author === "string" ? author.trim().slice(0, MAX_NAME_LENGTH) : "";
+  const cleanAuthor = containsForbiddenWord(rawAuthor) ? "" : rawAuthor;
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -50,7 +66,7 @@ Deno.serve(async (req) => {
   const since = new Date(Date.now() - WINDOW_MS).toISOString();
 
   const { count, error: countError } = await supabase
-    .from("report_rate_limits")
+    .from("message_rate_limits")
     .select("id", { count: "exact", head: true })
     .eq("ip", ip)
     .gte("created_at", since);
@@ -60,7 +76,7 @@ Deno.serve(async (req) => {
   }
 
   if ((count ?? 0) >= RATE_LIMIT) {
-    return json({ error: "Alcanzaste el límite de reportes por hora. Probá más tarde." }, 429);
+    return json({ error: "Alcanzaste el límite de mensajes por hora. Probá más tarde." }, 429);
   }
 
   const { data: altar, error: fetchError } = await supabase
@@ -73,24 +89,17 @@ Deno.serve(async (req) => {
     return json({ error: "El altar no existe." }, 404);
   }
 
-  const { error: markError } = await supabase.from("report_rate_limits").insert({ ip, slug });
-  if (markError) {
-    // Índice único (ip, slug): ya lo había reportado antes.
-    if (markError.code === "23505") {
-      return json({ error: "Ya reportaste este altar." }, 409);
-    }
-    return json({ error: "No se pudo registrar el reporte." }, 500);
-  }
-
-  // Incremento atómico (una sola sentencia SQL): evita que reportes casi
-  // simultáneos se pisen entre sí y el conteo quede corto.
-  const { data: result, error: incrementError } = await supabase
-    .rpc("increment_altar_report", { p_slug: slug, p_hide_threshold: HIDE_THRESHOLD })
+  const { data: message, error: insertError } = await supabase
+    .from("messages")
+    .insert({ slug, text, author: cleanAuthor })
+    .select("id, text, author, created_at")
     .single();
 
-  if (incrementError || !result) {
-    return json({ error: "No se pudo registrar el reporte." }, 500);
+  if (insertError || !message) {
+    return json({ error: "No se pudo guardar el mensaje." }, 500);
   }
 
-  return json({ ok: true, reportedCount: result.reported_count });
+  await supabase.from("message_rate_limits").insert({ ip });
+
+  return json({ message });
 });

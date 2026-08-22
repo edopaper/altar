@@ -8,6 +8,8 @@ import AltarViewer from './components/AltarViewer.jsx'
 import ThumbnailStage from './components/ThumbnailStage.jsx'
 import AboutPanel from './components/AboutPanel.jsx'
 import Toast from './components/Toast.jsx'
+import AdminDashboard, { POST_LOGIN_REDIRECT_KEY } from './components/AdminDashboard.jsx'
+import { supabase } from './supabaseClient.js'
 import { saveSharedAltar } from './storage.js'
 import { MODEL_CATEGORIES, MODEL_LIST } from './models.js'
 import { PAPER_LIST } from './papel.js'
@@ -92,12 +94,29 @@ function useHashRoute() {
 
 export default function App() {
   const hash = useHashRoute()
+
+  // Tras volver del login con GitHub (sin hash propio en el redirectTo, para
+  // no chocar con supabase-js al parsear el token de la URL), si el usuario
+  // había arrancado el login desde el panel de admin lo mandamos de vuelta.
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event !== 'SIGNED_IN') return
+      const redirect = sessionStorage.getItem(POST_LOGIN_REDIRECT_KEY)
+      if (redirect) {
+        sessionStorage.removeItem(POST_LOGIN_REDIRECT_KEY)
+        window.location.hash = redirect
+      }
+    })
+    return () => sub.subscription.unsubscribe()
+  }, [])
+
   // Ruta oculta usada solo por scripts/generate-thumbnails.mjs, para
   // renderizar un modelo a la vez sobre fondo transparente.
   const thumbMatch = hash.match(/^#\/thumb\/(.+)$/)
   if (thumbMatch) return <ThumbnailStage path={decodeURIComponent(thumbMatch[1])} />
   const viewMatch = hash.match(/^#\/ver\/([a-z0-9]+)/i)
   if (viewMatch) return <AltarViewer slug={viewMatch[1]} />
+  if (hash.startsWith('#/admin')) return <AdminDashboard />
   return <AltarEditor />
 }
 
@@ -191,7 +210,7 @@ function AltarEditor() {
 
     setIsSharing(true)
     try {
-      const { slug, remaining, limit } = await saveSharedAltar({ objects, photo, clothColor })
+      const { slug, remaining, limit, updated } = await saveSharedAltar({ objects, photo, clothColor })
       const url = `${window.location.origin}${window.location.pathname}#/ver/${slug}`
       lastSharedRef.current = { key: shareKey, url }
 
@@ -200,10 +219,14 @@ function AltarEditor() {
         typeof remaining === 'number' && typeof limit === 'number'
           ? `\nTe quedan ${remaining} de ${limit} compartidos esta hora.`
           : ''
-      showToast(
-        (copied ? 'Enlace copiado al portapapeles.' : `No se pudo copiar. Enlace:\n${url}`) + limitNote,
-        'success',
-      )
+      const baseMessage = updated
+        ? copied
+          ? 'Altar actualizado. Mismo enlace de siempre, copiado de nuevo.'
+          : `Altar actualizado. Mismo enlace de siempre:\n${url}`
+        : copied
+          ? 'Enlace copiado al portapapeles.'
+          : `No se pudo copiar. Enlace:\n${url}`
+      showToast(baseMessage + limitNote, 'success')
     } catch (err) {
       showToast(err?.message || 'No se pudo compartir el altar. Probá de nuevo en un momento.', 'error')
     } finally {

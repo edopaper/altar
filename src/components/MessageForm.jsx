@@ -6,9 +6,13 @@ export default function MessageForm({ slug, onClose, onSaved }) {
   const [text, setText] = useState('')
   const [author, setAuthor] = useState('')
   const [error, setError] = useState('')
+  const [sending, setSending] = useState(false)
 
-  const submit = () => {
-    const result = saveMessage(slug, { text, author })
+  const submit = async () => {
+    if (sending) return
+    setSending(true)
+    const result = await saveMessage(slug, { text, author })
+    setSending(false)
     if (!result.ok) {
       setError(result.error)
       return
@@ -48,8 +52,8 @@ export default function MessageForm({ slug, onClose, onSaved }) {
           <button className="btn" onClick={onClose}>
             Cancelar
           </button>
-          <button className="btn btn--active" onClick={submit} disabled={!text.trim()}>
-            Enviar
+          <button className="btn btn--active" onClick={submit} disabled={!text.trim() || sending}>
+            {sending ? 'Enviando…' : 'Enviar'}
           </button>
         </div>
       </div>

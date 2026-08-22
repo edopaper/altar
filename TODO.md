@@ -25,13 +25,55 @@ un altar ya publicado. Vamos paso a paso.
 - [x] Botón "Reportar" en `AltarViewer.jsx`, con confirmación simple.
 
 ## 4. Ocultamiento automático + revisión
-- [ ] Columna `status` (`visible` / `hidden`) en `altars`, default `visible`.
-- [ ] Si `reported_count` supera un umbral (a definir), marcar `hidden`
+- [x] Columna `status` (`visible` / `hidden`) en `altars`, default `visible`.
+- [x] Si `reported_count` supera un umbral (5), marcar `hidden`
       automáticamente.
-- [ ] `AltarViewer` respeta `status = hidden` (muestra "no disponible").
-- [ ] Vista o función simple (protegida, no anon) para listar altares
+- [x] `AltarViewer` respeta `status = hidden` (muestra "no disponible").
+- [x] Función simple (protegida por secreto, no anon) para listar altares
       ocultos/reportados y poder revisarlos manualmente.
 
-## Fuera de alcance (por ahora)
-- Moderación de imágenes vía API externa (modelo de visión).
-- Login / cuentas de usuario / panel admin completo.
+## 5. Login con GitHub + dashboard de admin
+- [x] OAuth App en GitHub + provider habilitado en Supabase Auth
+      (`supabase/config.toml`, `[auth.external.github]`).
+- [x] Tabla `admin_github_users` + función `is_admin()` (RLS) para
+      restringir el acceso a tu usuario de GitHub (`edopaper`).
+- [x] Policy `altars_update_admin`: un admin autenticado puede actualizar
+      `altars` directo (ocultar/restaurar) sin pasar por `ADMIN_SECRET`.
+- [x] Ruta `#/admin` (`AdminDashboard.jsx`): login con GitHub, lista de
+      altares reportados/ocultos, botones Ocultar/Restaurar.
+- [ ] (Opcional) Retirar `admin-altars` Edge Function y `ADMIN_SECRET`
+      ahora que el dashboard cubre lo mismo vía RLS.
+
+## 6. Migrar mensajes a Supabase + moderarlos desde el dashboard
+- [x] Tabla `messages` (antes vivían en localStorage, ni siquiera se veían
+      entre visitantes del mismo altar) con `status` visible/hidden y RLS:
+      público ve solo visibles, admin ve y modera todo.
+- [x] Nueva Edge Function `add-message` (mismo patrón que `share-altar`):
+      valida longitud, palabras prohibidas y rate limit por IP.
+- [x] `messages.js` / `MessageForm.jsx` / `AltarViewer.jsx` reescritos para
+      leer/escribir contra Supabase en vez de `localStorage`.
+- [x] `AltarViewer` deja que un admin logueado vea un altar oculto (con
+      banner "vista de admin"), en vez de bloquearlo para todos.
+- [x] Dashboard (`#/admin`): tarjetas expandibles por altar, con link "Ver
+      altar", conteo y lista de mensajes, y acciones Ocultar/Restaurar/Borrar
+      por mensaje.
+- [x] Módulo `supabase/functions/_shared/forbidden-words.ts` compartido
+      entre `share-altar` y `add-message`.
+
+## Backlog (sin ordenar — decimos cuál sigue)
+- [ ] Retirar `admin-altars` Edge Function y `ADMIN_SECRET` (obsoletos desde
+      que el dashboard hace lo mismo vía RLS + login).
+- [ ] Rotar el Client Secret de la OAuth App de GitHub (se pegó en el chat).
+- [x] Reportar un mensaje puntual, no solo el altar completo.
+- [ ] Moderación real de fotos (contenido de la imagen, no solo que sea una
+      imagen válida) vía API de visión.
+- [x] Housekeeping: borrar filas viejas de `share_rate_limits`,
+      `report_rate_limits`, `message_rate_limits`,
+      `message_report_rate_limits` (crecen sin límite).
+- [ ] Aviso proactivo (email/webhook) cuando un altar se oculta
+      automáticamente, en vez de depender de entrar a `#/admin`.
+- [x] Paginación en el dashboard si la lista de reportados o de mensajes
+      por altar crece mucho.
+- [x] Compartir de nuevo el mismo altar actualiza la misma fila en vez de
+      crear una nueva cada vez (bug reportado: cada "Compartir" insertaba
+      un altar distinto).

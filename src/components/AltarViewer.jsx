@@ -4,7 +4,9 @@ import AltarScene from './AltarScene.jsx'
 import MusicPlayer from './MusicPlayer.jsx'
 import { loadSharedAltar, reportAltar } from '../storage.js'
 import { loadMessages } from '../messages.js'
+import { supabase } from '../supabaseClient.js'
 import MessageForm from './MessageForm.jsx'
+import MessageList from './MessageList.jsx'
 
 const noop = () => {}
 const IDLE_DELAY_MS = 4000
@@ -47,6 +49,7 @@ export default function AltarViewer({ slug }) {
   const [status, setStatus] = useState('loading') // 'loading' | 'ready' | 'missing' | 'error'
   const [messages, setMessages] = useState([])
   const [showMessageForm, setShowMessageForm] = useState(false)
+  const [showMessageList, setShowMessageList] = useState(false)
   const [reportState, setReportState] = useState('idle') // 'idle' | 'sending' | 'sent' | 'error'
 
   useEffect(() => {
@@ -55,14 +58,33 @@ export default function AltarViewer({ slug }) {
     setData(null)
 
     loadSharedAltar(slug)
-      .then((altar) => {
+      .then(async (altar) => {
         if (cancelled) return
         if (!altar) {
           setStatus('missing')
           return
         }
-        setData(altar)
-        setMessages(loadMessages(slug))
+        if (altar.status === 'hidden') {
+          // Oculto al público, pero un admin logueado sí puede previsualizarlo
+          // (ej. para revisar un reporte antes de decidir).
+          const { data: sessionData } = await supabase.auth.getSession()
+          let admin = false
+          if (sessionData.session) {
+            const { data: adminCheck } = await supabase.rpc('is_admin')
+            admin = adminCheck === true
+          }
+          if (cancelled) return
+          if (!admin) {
+            setStatus('hidden')
+            return
+          }
+          setData({ ...altar, adminPreview: true })
+        } else {
+          setData(altar)
+        }
+        loadMessages(slug).then((msgs) => {
+          if (!cancelled) setMessages(msgs)
+        })
         setStatus('ready')
       })
       .catch(() => {
@@ -107,6 +129,18 @@ export default function AltarViewer({ slug }) {
     )
   }
 
+  if (status === 'hidden') {
+    return (
+      <div className="viewer-missing">
+        <h1>Altar no disponible</h1>
+        <p>Este altar fue ocultado tras varios reportes y está en revisión.</p>
+        <a className="btn viewer-missing-btn" href="#/">
+          Crear mi propio altar
+        </a>
+      </div>
+    )
+  }
+
   if (status === 'missing' || !data) {
     return (
       <div className="viewer-missing">
@@ -121,6 +155,12 @@ export default function AltarViewer({ slug }) {
 
   return (
     <div className="app">
+      {data.adminPreview && (
+        <div className="admin-preview-banner">
+          Vista de admin — este altar está oculto al público.{' '}
+          <a href="#/admin">Volver al panel</a>
+        </div>
+      )}
       <Canvas shadows camera={{ position: [0, 3.2, 5.5], fov: 50 }}>
         <AltarScene
           photo={data.photo}
@@ -143,6 +183,11 @@ export default function AltarViewer({ slug }) {
           <button className="btn" onClick={() => setShowMessageForm(true)}>
             Dejar un mensaje
           </button>
+          {messages.length > 0 && (
+            <button className="btn" onClick={() => setShowMessageList(true)}>
+              Ver mensajes ({messages.length})
+            </button>
+          )}
           <a className="btn" href="#/">
             Crear mi propio altar
           </a>
@@ -167,6 +212,10 @@ export default function AltarViewer({ slug }) {
           onClose={() => setShowMessageForm(false)}
           onSaved={(message) => setMessages((prev) => [...prev, message])}
         />
+      )}
+
+      {showMessageList && (
+        <MessageList messages={messages} onClose={() => setShowMessageList(false)} />
       )}
     </div>
   )

@@ -1,10 +1,17 @@
 // Edge Function: único punto para compartir un altar. Valida el rate limit
-// por IP, sube la foto (si hay) y hace el insert en `altars`, todo con la
-// service role key (el cliente ya no tiene permiso de insert directo).
+// por IP, sube la foto (si hay) y hace el insert/update en `altars`, todo
+// con la service role key (el cliente ya no tiene permiso de insert
+// directo).
+//
+// Compartir de nuevo el mismo altar actualiza la misma fila en vez de crear
+// una nueva: el cliente guarda `{slug, editToken}` en localStorage tras el
+// primer share y los reenvía. `editToken` es un secreto por altar (nunca
+// legible por anon/authenticated, ver migración 012) que demuestra que
+// quien pide la edición es quien lo compartió originalmente.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { containsForbiddenWord } from "./forbidden-words.ts";
+import { containsForbiddenWord } from "../_shared/forbidden-words.ts";
 
-const RATE_LIMIT = 5; // altares por IP
+const RATE_LIMIT = 5; // altares nuevos por IP
 const WINDOW_MS = 60 * 60 * 1000; // 1 hora
 const MAX_OBJECTS = 150;
 const PHOTO_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -72,7 +79,7 @@ Deno.serve(async (req) => {
     return json({ error: "JSON inválido" }, 400);
   }
 
-  const { name, objects, clothColor, photo } = payload ?? {};
+  const { name, objects, clothColor, photo, slug: requestedSlug, editToken } = payload ?? {};
 
   if (!Array.isArray(objects) || objects.length > MAX_OBJECTS) {
     return json({ error: "El altar tiene datos inválidos." }, 400);
@@ -88,6 +95,76 @@ Deno.serve(async (req) => {
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
+  // Sube la foto (si hay) al path `${slug}.${ext}`; `upsert` en true permite
+  // reemplazar la foto de un altar que ya existe.
+  async function uploadPhoto(slug: string, upsert: boolean): Promise<string | null> {
+    if (typeof photo !== "string" || !photo) return null;
+    const decoded = decodeDataUrl(photo);
+    if (!decoded) throw json({ error: "Foto inválida." }, 400);
+    if (decoded.bytes.byteLength > PHOTO_MAX_BYTES) {
+      throw json({ error: "La foto supera el máximo permitido (5 MB)." }, 400);
+    }
+    const realType = sniffImageType(decoded.bytes);
+    if (!realType) {
+      throw json({ error: "La foto debe ser una imagen PNG o JPG válida." }, 400);
+    }
+    const ext = realType === "image/png" ? "png" : "jpg";
+    const path = `${slug}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from("altar-photos")
+      .upload(path, decoded.bytes, { contentType: realType, upsert });
+    if (uploadError) throw json({ error: "No se pudo subir la foto." }, 500);
+
+    const { data: publicUrlData } = supabase.storage.from("altar-photos").getPublicUrl(path);
+    return publicUrlData.publicUrl;
+  }
+
+  // --- Actualizar un altar ya compartido, si el cliente mandó slug+editToken
+  // y coinciden con lo que guardamos al crearlo. No consume el rate limit de
+  // altares nuevos, y no toca `status`/`reported_count` (el historial de
+  // moderación se conserva aunque se edite el contenido).
+  if (typeof requestedSlug === "string" && requestedSlug && typeof editToken === "string" && editToken) {
+    const { data: existing, error: fetchError } = await supabase
+      .from("altars")
+      .select("edit_token")
+      .eq("slug", requestedSlug)
+      .maybeSingle();
+
+    if (fetchError) {
+      return json({ error: "No se pudo actualizar el altar." }, 500);
+    }
+    if (!existing || existing.edit_token !== editToken) {
+      return json(
+        { error: "No tenés permiso para editar ese altar.", invalidEditToken: true },
+        403,
+      );
+    }
+
+    let photoUrl: string | null;
+    try {
+      photoUrl = await uploadPhoto(requestedSlug, true);
+    } catch (res) {
+      return res as Response;
+    }
+
+    const { error: updateError } = await supabase
+      .from("altars")
+      .update({
+        name: (name as string) || "Altar de muertos",
+        objects,
+        photo_url: photoUrl,
+        cloth_color: (clothColor as string) ?? null,
+      })
+      .eq("slug", requestedSlug);
+
+    if (updateError) {
+      return json({ error: "No se pudo actualizar el altar." }, 500);
+    }
+
+    return json({ slug: requestedSlug, editToken, updated: true });
+  }
+
+  // --- Crear un altar nuevo.
   const ip = getClientIp(req);
   const since = new Date(Date.now() - WINDOW_MS).toISOString();
 
@@ -117,30 +194,16 @@ Deno.serve(async (req) => {
     );
   }
 
-  let photoUrl: string | null = null;
+  const newEditToken = crypto.randomUUID();
 
   for (let attempt = 0; attempt < SLUG_ATTEMPTS; attempt++) {
     const slug = randomSlug();
 
-    if (typeof photo === "string" && photo && !photoUrl) {
-      const decoded = decodeDataUrl(photo);
-      if (!decoded) return json({ error: "Foto inválida." }, 400);
-      if (decoded.bytes.byteLength > PHOTO_MAX_BYTES) {
-        return json({ error: "La foto supera el máximo permitido (5 MB)." }, 400);
-      }
-      const realType = sniffImageType(decoded.bytes);
-      if (!realType) {
-        return json({ error: "La foto debe ser una imagen PNG o JPG válida." }, 400);
-      }
-      const ext = realType === "image/png" ? "png" : "jpg";
-      const path = `${slug}.${ext}`;
-      const { error: uploadError } = await supabase.storage
-        .from("altar-photos")
-        .upload(path, decoded.bytes, { contentType: realType, upsert: false });
-      if (uploadError) return json({ error: "No se pudo subir la foto." }, 500);
-
-      const { data: publicUrlData } = supabase.storage.from("altar-photos").getPublicUrl(path);
-      photoUrl = publicUrlData.publicUrl;
+    let photoUrl: string | null;
+    try {
+      photoUrl = await uploadPhoto(slug, false);
+    } catch (res) {
+      return res as Response;
     }
 
     const { error: insertError } = await supabase.from("altars").insert({
@@ -149,12 +212,13 @@ Deno.serve(async (req) => {
       objects,
       photo_url: photoUrl,
       cloth_color: (clothColor as string) ?? null,
+      edit_token: newEditToken,
     });
 
     if (!insertError) {
       await supabase.from("share_rate_limits").insert({ ip });
       const remaining = Math.max(0, RATE_LIMIT - (count + 1));
-      return json({ slug, remaining, limit: RATE_LIMIT });
+      return json({ slug, editToken: newEditToken, remaining, limit: RATE_LIMIT });
     }
 
     if (insertError.code !== "23505") {
