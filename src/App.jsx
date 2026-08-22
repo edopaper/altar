@@ -6,12 +6,14 @@ import TransformToolbar from './components/TransformToolbar.jsx'
 import MusicPlayer from './components/MusicPlayer.jsx'
 import AltarViewer from './components/AltarViewer.jsx'
 import ThumbnailStage from './components/ThumbnailStage.jsx'
+import AboutPanel from './components/AboutPanel.jsx'
 import { saveSharedAltar } from './storage.js'
 import { MODEL_CATEGORIES, MODEL_LIST } from './models.js'
 import { PAPER_LIST } from './papel.js'
 
-// Punto donde aparecen los objetos nuevos: centro del altar (nivel medio).
-const SPAWN_POSITION = [0, 1.0, -2.2]
+// Punto donde aparecen los objetos nuevos: por encima del escalón más alto
+// (y=1.75) para que el modelo no nazca oculto/enterrado dentro de la grada.
+const SPAWN_POSITION = [0, 2.0, -2.2]
 
 const SHAPE_LABELS = { cube: 'Cubo', sphere: 'Esfera', cone: 'Prisma' }
 
@@ -97,6 +99,7 @@ function AltarEditor() {
   const [mode, setMode] = useState('translate')
   const [snap, setSnap] = useState(false)
   const [menuOpen, setMenuOpen] = useState(true)
+  const [aboutOpen, setAboutOpen] = useState(false)
   const focusRef = useRef(null) // lo llena AltarScene para centrar la cámara
 
   // Autoguardado: cada cambio en la escena se persiste en localStorage.
@@ -350,8 +353,11 @@ function AltarEditor() {
         onModeChange={setMode}
         maxObjects={MAX_OBJECTS}
         objectsWarningAt={OBJECTS_WARNING_THRESHOLD}
+        onShowAbout={() => setAboutOpen(true)}
       />
       )}
+
+      {aboutOpen && <AboutPanel onClose={() => setAboutOpen(false)} />}
 
       <TransformToolbar mode={mode} onModeChange={setMode} hasSelection={!!selected} />
       <MusicPlayer />

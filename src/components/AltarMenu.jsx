@@ -49,6 +49,7 @@ export default function AltarMenu({
   onHide,
   maxObjects,
   objectsWarningAt,
+  onShowAbout,
 }) {
   return (
     <aside className="menu">
@@ -234,6 +235,9 @@ export default function AltarMenu({
       <div className="menu-hint">
         Click: seleccionar · Click fuera: deseleccionar · G/R/S: modo · Esc: soltar
       </div>
+      <button className="menu-about-link" onClick={onShowAbout}>
+        Acerca de
+      </button>
       </div>
     </aside>
   )
