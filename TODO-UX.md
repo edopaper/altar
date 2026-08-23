@@ -79,3 +79,13 @@ como prioridad.
 ### 11. Indicador continuo de cupo de objetos
 - [ ] Barra de progreso sutil y persistente junto a "Objetos en escena
       (n/max)" en vez de esperar al umbral `objectsWarningAt` para avisar.
+
+### 12. Modal de compartir con redes sociales
+- [x] `ShareModal.jsx`: reemplaza el toast de "enlace copiado" por un modal
+      con el link, botón "Copiar" y accesos a WhatsApp/Facebook/X/Email
+      (web intents, funcionan en desktop y mobile).
+- [x] Botón "Compartir…" con `navigator.share` (share sheet nativo) cuando
+      el navegador lo soporta — es lo que lo hace realmente funcional en
+      teléfono (incluye apps instaladas, no solo las 4 fijas).
+- [x] El link se sigue copiando al portapapeles en segundo plano al abrir
+      el modal (best-effort, no bloquea si el navegador lo rechaza).

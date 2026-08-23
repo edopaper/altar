@@ -8,6 +8,7 @@ import AltarViewer from './components/AltarViewer.jsx'
 import ThumbnailStage from './components/ThumbnailStage.jsx'
 import AboutPanel from './components/AboutPanel.jsx'
 import Onboarding from './components/Onboarding.jsx'
+import ShareModal from './components/ShareModal.jsx'
 import Toast from './components/Toast.jsx'
 import AdminDashboard, { POST_LOGIN_REDIRECT_KEY } from './components/AdminDashboard.jsx'
 import { supabase } from './supabaseClient.js'
@@ -245,6 +246,8 @@ function AltarEditor() {
 
   const [photo, setPhoto] = useState(() => localStorage.getItem(PHOTO_KEY))
   const [isSharing, setIsSharing] = useState(false)
+  // Modal de compartir (redes sociales + link): null mientras está cerrado.
+  const [shareInfo, setShareInfo] = useState(null)
   const [toast, setToast] = useState(null)
   const toastTimerRef = useRef(null)
   // Último altar compartido con éxito: si al tocar "Compartir" de nuevo el
@@ -292,22 +295,18 @@ function AltarEditor() {
     localStorage.removeItem(PHOTO_KEY)
   }
 
-  // Publica un snapshot del altar bajo un slug y copia el enlace del visor.
-  // Si el contenido es igual al del último share exitoso, no vuelve a llamar
-  // a la Edge Function: copia de nuevo el link ya existente.
+  // Publica un snapshot del altar bajo un slug y abre el modal de
+  // compartir (redes sociales + link). Si el contenido es igual al del
+  // último share exitoso, no vuelve a llamar a la Edge Function: reabre el
+  // modal con el link ya existente.
   const shareAltar = async () => {
     if (isSharing) return
 
     const shareKey = JSON.stringify({ objects, photo, clothColor })
     const cached = lastSharedRef.current
     if (cached && cached.key === shareKey) {
-      const copied = await copyToClipboard(cached.url)
-      showToast(
-        copied
-          ? 'Sin cambios desde la última vez. Mismo enlace, copiado de nuevo.'
-          : `Sin cambios desde la última vez. Mismo enlace:\n${cached.url}`,
-        'success',
-      )
+      copyToClipboard(cached.url) // best-effort, el modal ya deja copiar a mano
+      setShareInfo({ url: cached.url, note: 'Sin cambios desde la última vez.' })
       return
     }
 
@@ -318,20 +317,15 @@ function AltarEditor() {
       const entry = { key: shareKey, url }
       lastSharedRef.current = entry
       saveLastShare(entry)
+      copyToClipboard(url) // best-effort, el modal ya deja copiar a mano
 
-      const copied = await copyToClipboard(url)
       const limitNote =
         typeof remaining === 'number' && typeof limit === 'number'
-          ? `\nTe quedan ${remaining} de ${limit} compartidos esta hora.`
+          ? ` Te quedan ${remaining} de ${limit} compartidos esta hora.`
           : ''
-      const baseMessage = updated
-        ? copied
-          ? 'Cambios guardados en el mismo enlace de siempre, copiado de nuevo.'
-          : `Cambios guardados en el mismo enlace de siempre:\n${url}`
-        : copied
-          ? 'Enlace copiado al portapapeles. Si volvés a compartir, se actualiza este mismo enlace.'
-          : `No se pudo copiar. Si volvés a compartir, se actualiza este mismo enlace:\n${url}`
-      showToast(baseMessage + limitNote, 'success')
+      const note =
+        (updated ? 'Cambios guardados en el mismo enlace de siempre.' : 'Tu altar ya está publicado.') + limitNote
+      setShareInfo({ url, note })
     } catch (err) {
       showToast(err?.message || 'No se pudo compartir el altar. Probá de nuevo en un momento.', 'error')
     } finally {
@@ -578,6 +572,9 @@ function AltarEditor() {
 
       {aboutOpen && <AboutPanel onClose={() => setAboutOpen(false)} />}
       {showOnboarding && <Onboarding onClose={dismissOnboarding} />}
+      {shareInfo && (
+        <ShareModal url={shareInfo.url} note={shareInfo.note} onClose={() => setShareInfo(null)} />
+      )}
 
       <Toast toast={toast} onClose={() => setToast(null)} />
 
