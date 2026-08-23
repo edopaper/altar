@@ -151,6 +151,12 @@ function AltarEditor() {
     return saved
   })
   const [selectedId, setSelectedId] = useState(null)
+  // Espeja selectedId para leerlo desde el listener de teclado (atajo F de
+  // enfocar cámara) sin depender de una closure vieja.
+  const selectedIdRef = useRef(selectedId)
+  useEffect(() => {
+    selectedIdRef.current = selectedId
+  }, [selectedId])
   const [mode, setMode] = useState('translate')
   const [snap, setSnap] = useState(false)
   const [menuOpen, setMenuOpen] = useState(true)
@@ -468,8 +474,9 @@ function AltarEditor() {
     if (obj && focusRef.current) focusRef.current(obj.position)
   }
 
-  // Atajos estilo Blender: G mover, R rotar, S escalar. Ctrl/Cmd+Z deshace,
-  // Ctrl/Cmd+Shift+Z (o Ctrl+Y) rehace.
+  // Atajos estilo Blender: G mover, R rotar, S escalar, F enfoca la cámara
+  // en el objeto seleccionado. Ctrl/Cmd+Z deshace, Ctrl/Cmd+Shift+Z (o
+  // Ctrl+Y) rehace.
   useEffect(() => {
     const onKey = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
@@ -486,6 +493,10 @@ function AltarEditor() {
       else if (k === 'r') setMode('rotate')
       else if (k === 's') setMode('scale')
       else if (k === 'escape') setSelectedId(null)
+      else if (k === 'f') {
+        const obj = objectsRef.current.find((o) => o.id === selectedIdRef.current)
+        if (obj && focusRef.current) focusRef.current(obj.position)
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

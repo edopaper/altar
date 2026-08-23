@@ -70,9 +70,11 @@ como prioridad.
       otro en el viewport.
 
 ### 10. Centrar cámara en el objeto seleccionado ("foco")
-- [ ] Atajo (ej. tecla F) que anime la cámara del `Canvas` hacia la
-      posición del objeto seleccionado — útil en altares grandes donde no
-      es obvio dónde quedó un objeto elegido desde la lista.
+- [x] Atajo F que reutiliza `focusRef` (el mismo mecanismo que ya usaba
+      `selectFromList`) para apuntar la cámara al objeto seleccionado —
+      funciona sin importar cómo se seleccionó (lista o click en la
+      escena). No es una animación de dolly, solo re-apunta el pivot de
+      OrbitControls; si hace falta acercar también, es un paso aparte.
 
 ### 11. Indicador continuo de cupo de objetos
 - [ ] Barra de progreso sutil y persistente junto a "Objetos en escena
