@@ -6,6 +6,15 @@ const SHAPES = [
   { kind: 'cone', label: 'Prisma' },
 ]
 
+// Normaliza para comparar sin importar mayúsculas/acentos ("catrina" debe
+// encontrar "Catrina", "cráneo" debe encontrar "craneo").
+function normalize(s) {
+  return s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+}
+
 // Botón de modelo con preview: si el thumbnail (generado por
 // scripts/generate-thumbnails.mjs) todavía no existe, la imagen falla en
 // silencio y el botón cae de vuelta a mostrar solo el nombre.
@@ -39,8 +48,6 @@ export default function AltarMenu({
   onDelete,
   onToggleSnap,
   onClearAltar,
-  onShare,
-  isSharing,
   onModeChange,
   hasPhoto,
   onUploadPhoto,
@@ -52,6 +59,20 @@ export default function AltarMenu({
   objectsWarningAt,
   onShowAbout,
 }) {
+  const [decorQuery, setDecorQuery] = useState('')
+  const decorSearch = normalize(decorQuery.trim())
+  const isSearching = decorSearch.length > 0
+
+  const filteredPapers = isSearching
+    ? papers.filter((p) => normalize(p.name).includes(decorSearch))
+    : papers
+  const filteredCategories = isSearching
+    ? categories
+        .map((cat) => ({ ...cat, models: cat.models.filter((m) => normalize(m.name).includes(decorSearch)) }))
+        .filter((cat) => cat.models.length > 0)
+    : categories
+  const hasDecorResults = filteredPapers.length > 0 || filteredCategories.length > 0
+
   return (
     <aside className="menu">
       <div className="menu-header">
@@ -158,22 +179,35 @@ export default function AltarMenu({
             </button>
           ))}
         </div>
-        {papers.length > 0 && (
-          <>
-            <div className="menu-label">Papel picado</div>
-            <div className="model-grid model-grid--flat">
-              {papers.map((p) => (
-                <button key={p.path} className="model-btn" onClick={() => onAddPaper(p)} title={p.name}>
-                  {p.name}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-        <div className="menu-label">Modelo 3D ({models.length})</div>
+        <div className="menu-label">Decoración ({models.length + papers.length})</div>
+        <input
+          type="search"
+          className="decor-search"
+          placeholder="Buscar (ej. catrina, vela, calabaza)…"
+          value={decorQuery}
+          onChange={(e) => setDecorQuery(e.target.value)}
+        />
         <div className="category-list">
-          {categories.map((cat) => (
-            <details key={cat.category} className="category">
+          {!hasDecorResults && (
+            <div className="menu-empty">Sin resultados para «{decorQuery.trim()}»</div>
+          )}
+          {filteredPapers.length > 0 && (
+            <details className="category" open={isSearching || undefined}>
+              <summary className="category-header">
+                Papel picado <span className="category-count">{filteredPapers.length}</span>
+              </summary>
+              <div className="model-grid">
+                {filteredPapers.map((p) => (
+                  <button key={p.path} className="model-btn" onClick={() => onAddPaper(p)} title={p.name}>
+                    <img className="model-thumb" src={p.path} alt="" loading="lazy" />
+                    <span className="model-btn-label">{p.name}</span>
+                  </button>
+                ))}
+              </div>
+            </details>
+          )}
+          {filteredCategories.map((cat) => (
+            <details key={cat.category} className="category" open={isSearching || undefined}>
               <summary className="category-header">
                 {cat.category} <span className="category-count">{cat.models.length}</span>
               </summary>
@@ -224,13 +258,6 @@ export default function AltarMenu({
           <input type="checkbox" checked={snap} onChange={onToggleSnap} />
           Snap a rejilla (0.1 u / 15°)
         </label>
-        <button
-          className="btn btn--block"
-          onClick={onShare}
-          disabled={(objects.length === 0 && !hasPhoto) || isSharing}
-        >
-          {isSharing ? 'Compartiendo…' : 'Compartir altar'}
-        </button>
         <button className="btn btn--danger btn--block" onClick={onClearAltar} disabled={objects.length === 0}>
           Limpiar altar
         </button>

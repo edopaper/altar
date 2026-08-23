@@ -57,6 +57,28 @@ async function copyToClipboard(text) {
   }
 }
 
+// Recuerda el último altar compartido (huella del contenido + url) en
+// localStorage, no solo en memoria: así "sin cambios desde la última vez"
+// sigue siendo válido aunque se recargue la página o se vuelva otro día.
+const LAST_SHARE_KEY = 'altar-last-share-v1'
+
+function loadLastShare() {
+  try {
+    const raw = localStorage.getItem(LAST_SHARE_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+function saveLastShare(entry) {
+  try {
+    localStorage.setItem(LAST_SHARE_KEY, JSON.stringify(entry))
+  } catch {
+    // almacenamiento lleno o bloqueado: se ignora, solo se pierde el atajo
+  }
+}
+
 // Restaura la escena guardada; descarta objetos cuyo .glb ya no exista en la
 // carpeta de modelos (p. ej. si se renombró o movió el archivo).
 function loadSavedObjects() {
@@ -149,7 +171,9 @@ function AltarEditor() {
   // Último altar compartido con éxito: si al tocar "Compartir" de nuevo el
   // contenido es idéntico, se reusa el link ya generado en vez de volver a
   // pegarle a la Edge Function (menos carga, y no gasta cupo del rate limit).
-  const lastSharedRef = useRef(null)
+  // Se precarga desde localStorage para que la detección de "sin cambios"
+  // sobreviva a un reload, no solo dentro de la misma sesión.
+  const lastSharedRef = useRef(loadLastShare())
 
   const showToast = useCallback((message, type = 'info', duration = 5000) => {
     clearTimeout(toastTimerRef.current)
@@ -201,8 +225,8 @@ function AltarEditor() {
       const copied = await copyToClipboard(cached.url)
       showToast(
         copied
-          ? 'Este altar ya estaba compartido. Enlace copiado de nuevo.'
-          : `Este altar ya estaba compartido:\n${cached.url}`,
+          ? 'Sin cambios desde la última vez. Mismo enlace, copiado de nuevo.'
+          : `Sin cambios desde la última vez. Mismo enlace:\n${cached.url}`,
         'success',
       )
       return
@@ -212,7 +236,9 @@ function AltarEditor() {
     try {
       const { slug, remaining, limit, updated } = await saveSharedAltar({ objects, photo, clothColor })
       const url = `${window.location.origin}${window.location.pathname}#/ver/${slug}`
-      lastSharedRef.current = { key: shareKey, url }
+      const entry = { key: shareKey, url }
+      lastSharedRef.current = entry
+      saveLastShare(entry)
 
       const copied = await copyToClipboard(url)
       const limitNote =
@@ -221,11 +247,11 @@ function AltarEditor() {
           : ''
       const baseMessage = updated
         ? copied
-          ? 'Altar actualizado. Mismo enlace de siempre, copiado de nuevo.'
-          : `Altar actualizado. Mismo enlace de siempre:\n${url}`
+          ? 'Cambios guardados en el mismo enlace de siempre, copiado de nuevo.'
+          : `Cambios guardados en el mismo enlace de siempre:\n${url}`
         : copied
-          ? 'Enlace copiado al portapapeles.'
-          : `No se pudo copiar. Enlace:\n${url}`
+          ? 'Enlace copiado al portapapeles. Si volvés a compartir, se actualiza este mismo enlace.'
+          : `No se pudo copiar. Si volvés a compartir, se actualiza este mismo enlace:\n${url}`
       showToast(baseMessage + limitNote, 'success')
     } catch (err) {
       showToast(err?.message || 'No se pudo compartir el altar. Probá de nuevo en un momento.', 'error')
@@ -425,8 +451,6 @@ function AltarEditor() {
         onDelete={() => selected && removeObject(selected.id)}
         onToggleSnap={() => setSnap((s) => !s)}
         onClearAltar={clearAltar}
-        onShare={shareAltar}
-        isSharing={isSharing}
         hasPhoto={!!photo}
         onUploadPhoto={uploadPhoto}
         onRemovePhoto={removePhoto}
@@ -455,6 +479,21 @@ function AltarEditor() {
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
           <circle cx="12" cy="13" r="4" />
+        </svg>
+      </button>
+      <button
+        className="capture-btn share-btn"
+        onClick={shareAltar}
+        disabled={(objects.length === 0 && !photo) || isSharing}
+        title={isSharing ? 'Compartiendo…' : 'Compartir altar'}
+        aria-label={isSharing ? 'Compartiendo…' : 'Compartir altar'}
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="18" cy="5" r="3" />
+          <circle cx="6" cy="12" r="3" />
+          <circle cx="18" cy="19" r="3" />
+          <line x1="8.6" y1="10.5" x2="15.4" y2="6.5" />
+          <line x1="8.6" y1="13.5" x2="15.4" y2="17.5" />
         </svg>
       </button>
     </div>

@@ -273,6 +273,27 @@ canvas {
   text-align: center;
 }
 
+.decor-search {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  margin: 4px 0 6px;
+  font-size: 12px;
+  color: #e8e2f7;
+  border: 1px solid rgba(138, 127, 181, 0.35);
+  border-radius: 5px;
+  background: rgba(138, 127, 181, 0.08);
+}
+
+.decor-search:focus {
+  outline: none;
+  border-color: rgba(255, 170, 85, 0.5);
+}
+
+.decor-search::placeholder {
+  color: #8a7fb5;
+}
+
 .category-list {
   display: flex;
   flex-direction: column;
@@ -346,10 +367,6 @@ details[open] > .category-header::before {
   padding: 5px 0 8px 10px;
 }
 
-.model-grid--flat {
-  padding: 0 0 4px;
-}
-
 .model-btn {
   display: flex;
   flex-direction: column;
@@ -380,13 +397,6 @@ details[open] > .category-header::before {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* Papel picado no tiene preview generado: solo texto, más alto para
-   compensar visualmente la falta de imagen. */
-.model-grid--flat .model-btn {
-  flex-direction: row;
-  padding: 6px 4px;
 }
 
 .object-list {
@@ -770,6 +780,16 @@ details[open] > .category-header::before {
 .capture-btn:hover {
   background: rgba(255, 170, 85, 0.15);
   color: #ffb347;
+}
+
+.capture-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
+
+.share-btn {
+  bottom: 134px;
 }
 
 /* ---------- Reproductor de música ---------- */
