@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 const SHAPES = [
   { kind: 'cube', label: 'Cubo' },
@@ -30,6 +30,41 @@ function ModelThumbButton({ model, onClick }) {
   )
 }
 
+const NAME_MAX_LENGTH = 40
+
+// Input de nombre del objeto seleccionado: estado local para no reescribir
+// el objeto en cada tecla, se confirma con Enter/blur y se sincroniza de
+// nuevo si se selecciona otro objeto (key={selected.id} desde el caller).
+function RenameField({ id, name, onRename }) {
+  const [value, setValue] = useState(name)
+
+  useEffect(() => setValue(name), [name])
+
+  const commit = () => {
+    const trimmed = value.trim()
+    if (trimmed && trimmed !== name) onRename(id, trimmed)
+    else setValue(name) // vacío o sin cambios: vuelve al nombre actual
+  }
+
+  return (
+    <input
+      className="rename-input"
+      value={value}
+      maxLength={NAME_MAX_LENGTH}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur()
+        else if (e.key === 'Escape') {
+          setValue(name)
+          e.currentTarget.blur()
+        }
+      }}
+      aria-label="Nombre del objeto"
+    />
+  )
+}
+
 export default function AltarMenu({
   models,
   categories,
@@ -46,6 +81,7 @@ export default function AltarMenu({
   onColorChange,
   onDuplicate,
   onDelete,
+  onRename,
   onToggleSnap,
   onClearAltar,
   onModeChange,
@@ -139,7 +175,8 @@ export default function AltarMenu({
 
       {selected && (
         <section className="menu-section menu-section--active">
-          <h2>Seleccionado: {selected.name}</h2>
+          <h2>Seleccionado</h2>
+          <RenameField key={selected.id} id={selected.id} name={selected.name} onRename={onRename} />
           <div className="shape-row">
             <button className={`btn ${mode === 'translate' ? 'btn--active' : ''}`} onClick={() => onModeChange('translate')}>
               Mover

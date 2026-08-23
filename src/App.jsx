@@ -457,6 +457,11 @@ function AltarEditor() {
     markJustAdded(copy.id)
   }
 
+  const renameObject = (id, name) => {
+    pushHistory()
+    setObjects((prev) => prev.map((o) => (o.id === id ? { ...o, name } : o)))
+  }
+
   const selectFromList = (id) => {
     setSelectedId(id)
     const obj = objects.find((o) => o.id === id)
@@ -544,6 +549,7 @@ function AltarEditor() {
         onColorChange={(color) => selected && updateObject(selected.id, { color })}
         onDuplicate={() => selected && duplicateObject(selected.id)}
         onDelete={() => selected && removeObject(selected.id)}
+        onRename={renameObject}
         onToggleSnap={() => setSnap((s) => !s)}
         onClearAltar={clearAltar}
         hasPhoto={!!photo}

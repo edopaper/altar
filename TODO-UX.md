@@ -53,9 +53,9 @@ como prioridad.
       x/z.)
 
 ### 7. Renombrar objetos desde el panel "Seleccionado"
-- [ ] Input editable para `selected.name` en `AltarMenu.jsx`, reflejado en
-      la lista "Objetos en escena".
-- [ ] Mantener el nombre auto-generado como placeholder/default.
+- [x] Input editable (`RenameField`) para `selected.name` en
+      `AltarMenu.jsx`, reflejado en la lista "Objetos en escena" (mismo
+      estado `objects`). Se confirma con Enter/blur, Esc cancela.
 
 ### 8. Persistir estado del reproductor de música
 - [ ] Guardar volumen (y opcionalmente última pista) en `localStorage`

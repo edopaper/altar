@@ -273,7 +273,8 @@ canvas {
   text-align: center;
 }
 
-.decor-search {
+.decor-search,
+.rename-input {
   width: 100%;
   box-sizing: border-box;
   padding: 6px 8px;
@@ -285,13 +286,18 @@ canvas {
   background: rgba(138, 127, 181, 0.08);
 }
 
-.decor-search:focus {
+.decor-search:focus,
+.rename-input:focus {
   outline: none;
   border-color: rgba(255, 170, 85, 0.5);
 }
 
 .decor-search::placeholder {
   color: #8a7fb5;
+}
+
+.rename-input {
+  font-weight: 600;
 }
 
 .category-list {
