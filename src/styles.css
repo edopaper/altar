@@ -874,11 +874,16 @@ details[open] > .category-header::before {
 }
 
 /* ---------- Toolbar de modos ---------- */
-.toolbar {
+.toolbar-group {
   position: absolute;
   top: 14px;
   left: 50%;
   transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+}
+
+.toolbar {
   display: flex;
   gap: 6px;
   padding: 6px;
@@ -890,6 +895,18 @@ details[open] > .category-header::before {
 
 .toolbar--dim {
   opacity: 0.45;
+}
+
+.toolbar-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.toolbar-btn--icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px;
 }
 
 .toolbar-btn {

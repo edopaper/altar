@@ -265,7 +265,7 @@ export default function AltarMenu({
       </section>
 
       <div className="menu-hint">
-        Click: seleccionar · Click fuera: deseleccionar · G/R/S: modo · Esc: soltar
+        Click: seleccionar · Click fuera: deseleccionar · G/R/S: modo · Esc: soltar · Ctrl+Z: deshacer
       </div>
       <button className="menu-about-link" onClick={onShowAbout}>
         Acerca de

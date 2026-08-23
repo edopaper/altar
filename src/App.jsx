@@ -155,6 +155,53 @@ function AltarEditor() {
   const [aboutOpen, setAboutOpen] = useState(false)
   const focusRef = useRef(null) // lo llena AltarScene para centrar la cámara
 
+  // Historial para Ctrl+Z / Ctrl+Shift+Z: pilas de snapshots de `objects`
+  // (acotadas para no crecer sin límite en una sesión larga). objectsRef
+  // espeja el estado más reciente para que undo/redo (llamados desde el
+  // listener de teclado, con identidad estable) siempre lean el valor
+  // actual sin depender de closures viejas.
+  const HISTORY_LIMIT = 20
+  const objectsRef = useRef(objects)
+  useEffect(() => {
+    objectsRef.current = objects
+  }, [objects])
+  const historyRef = useRef([])
+  const futureRef = useRef([])
+  const [canUndo, setCanUndo] = useState(false)
+  const [canRedo, setCanRedo] = useState(false)
+
+  // Guarda el estado previo a un cambio para poder deshacerlo. Cualquier
+  // acción nueva descarta el "rehacer" pendiente (se abre una rama nueva).
+  // Se llama ANTES de aplicar el cambio con setObjects.
+  const pushHistory = () => {
+    historyRef.current = [...historyRef.current, objectsRef.current].slice(-HISTORY_LIMIT)
+    futureRef.current = []
+    setCanUndo(true)
+    setCanRedo(false)
+  }
+
+  const undo = useCallback(() => {
+    if (historyRef.current.length === 0) return
+    const past = historyRef.current[historyRef.current.length - 1]
+    historyRef.current = historyRef.current.slice(0, -1)
+    futureRef.current = [...futureRef.current, objectsRef.current].slice(-HISTORY_LIMIT)
+    setObjects(past)
+    setSelectedId(null)
+    setCanUndo(historyRef.current.length > 0)
+    setCanRedo(true)
+  }, [])
+
+  const redo = useCallback(() => {
+    if (futureRef.current.length === 0) return
+    const next = futureRef.current[futureRef.current.length - 1]
+    futureRef.current = futureRef.current.slice(0, -1)
+    historyRef.current = [...historyRef.current, objectsRef.current].slice(-HISTORY_LIMIT)
+    setObjects(next)
+    setSelectedId(null)
+    setCanRedo(futureRef.current.length > 0)
+    setCanUndo(true)
+  }, [])
+
   // Autoguardado: cada cambio en la escena se persiste en localStorage.
   useEffect(() => {
     try {
@@ -278,7 +325,8 @@ function AltarEditor() {
 
   const clearAltar = () => {
     if (objects.length === 0) return
-    if (!window.confirm('¿Quitar todos los objetos del altar? Esta acción no se puede deshacer.')) return
+    if (!window.confirm('¿Quitar todos los objetos del altar? Podés deshacerlo con Ctrl+Z.')) return
+    pushHistory()
     setObjects([])
     setSelectedId(null)
   }
@@ -306,6 +354,7 @@ function AltarEditor() {
       scale: [1, 1, 1],
       color: '#e8873b',
     }
+    pushHistory()
     setObjects((prev) => [...prev, obj])
     setSelectedId(obj.id)
   }
@@ -323,6 +372,7 @@ function AltarEditor() {
       scale: [1, 1, 1],
       color: '#ffffff',
     }
+    pushHistory()
     setObjects((prev) => [...prev, obj])
     setSelectedId(obj.id)
   }
@@ -341,20 +391,24 @@ function AltarEditor() {
       scale: [1, 1, 1],
       color: '#d6217e', // rosa mexicano
     }
+    pushHistory()
     setObjects((prev) => [...prev, obj])
     setSelectedId(obj.id)
   }
 
   const updateObject = useCallback((id, patch) => {
+    pushHistory()
     setObjects((prev) => prev.map((o) => (o.id === id ? { ...o, ...patch } : o)))
   }, [])
 
   const removeObject = (id) => {
+    pushHistory()
     setObjects((prev) => prev.filter((o) => o.id !== id || o.locked))
     setSelectedId((sel) => (sel === id ? null : sel))
   }
 
   const toggleLock = (id) => {
+    pushHistory()
     setObjects((prev) => prev.map((o) => (o.id === id ? { ...o, locked: !o.locked } : o)))
   }
 
@@ -368,6 +422,7 @@ function AltarEditor() {
       name: `${src.name} (copia)`,
       position: [src.position[0] + 0.3, src.position[1], src.position[2] + 0.3],
     }
+    pushHistory()
     setObjects((prev) => [...prev, copy])
     setSelectedId(copy.id)
   }
@@ -378,19 +433,28 @@ function AltarEditor() {
     if (obj && focusRef.current) focusRef.current(obj.position)
   }
 
-  // Atajos estilo Blender: G mover, R rotar, S escalar
+  // Atajos estilo Blender: G mover, R rotar, S escalar. Ctrl/Cmd+Z deshace,
+  // Ctrl/Cmd+Shift+Z (o Ctrl+Y) rehace.
   useEffect(() => {
     const onKey = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+      const cmd = e.ctrlKey || e.metaKey
       const k = e.key.toLowerCase()
-      if (k === 'g') setMode('translate')
+      if (cmd && k === 'z') {
+        e.preventDefault()
+        if (e.shiftKey) redo()
+        else undo()
+      } else if (cmd && k === 'y') {
+        e.preventDefault()
+        redo()
+      } else if (k === 'g') setMode('translate')
       else if (k === 'r') setMode('rotate')
       else if (k === 's') setMode('scale')
       else if (k === 'escape') setSelectedId(null)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [undo, redo])
 
   const selected = objects.find((o) => o.id === selectedId) ?? null
 
@@ -468,7 +532,15 @@ function AltarEditor() {
 
       <Toast toast={toast} onClose={() => setToast(null)} />
 
-      <TransformToolbar mode={mode} onModeChange={setMode} hasSelection={!!selected} />
+      <TransformToolbar
+        mode={mode}
+        onModeChange={setMode}
+        hasSelection={!!selected}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onUndo={undo}
+        onRedo={redo}
+      />
       <MusicPlayer />
       <button
         className="capture-btn"

@@ -15,10 +15,12 @@ como prioridad.
 - [x] Estado vacío ("Sin resultados para «...»") si ningún modelo matchea.
 
 ### 2. Undo (Ctrl+Z) para mover/borrar/agregar
-- [ ] Historial simple de snapshots de `objects` (pila acotada, ej. 20
+- [x] Historial simple de snapshots de `objects` (pila acotada, ej. 20
       pasos) en `App.jsx`.
-- [ ] Atajo Ctrl+Z (y Ctrl+Shift+Z o Ctrl+Y para redo) además de los que ya
+- [x] Atajo Ctrl+Z (y Ctrl+Shift+Z o Ctrl+Y para redo) además de los que ya
       existen (G/R/S/Esc).
+- [x] Botones ↶/↷ en la toolbar flotante (`TransformToolbar.jsx`) para
+      quien no tiene teclado (mobile) o no conoce el atajo.
 - [ ] Una vez que exista undo, reevaluar si "Eliminar" un objeto individual
       necesita seguir sin confirmación, o si "Limpiar altar" puede perder su
       `window.confirm` (ver punto 5).
@@ -44,9 +46,10 @@ como prioridad.
       altar" también, o reemplazarlo por un toast con "Deshacer".
 
 ### 6. Duplicar con offset visible
-- [ ] `duplicateObject` en `App.jsx`: aplicar un pequeño desplazamiento
+- [x] `duplicateObject` en `App.jsx`: aplicar un pequeño desplazamiento
       (ej. +0.2 en x/z) al clon para que se note al instante, sin que quede
-      exactamente superpuesto al original.
+      exactamente superpuesto al original. (Ya estaba implementado: +0.3 en
+      x/z.)
 
 ### 7. Renombrar objetos desde el panel "Seleccionado"
 - [ ] Input editable para `selected.name` en `AltarMenu.jsx`, reflejado en
