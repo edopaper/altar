@@ -7,6 +7,7 @@ import MusicPlayer from './components/MusicPlayer.jsx'
 import AltarViewer from './components/AltarViewer.jsx'
 import ThumbnailStage from './components/ThumbnailStage.jsx'
 import AboutPanel from './components/AboutPanel.jsx'
+import Onboarding from './components/Onboarding.jsx'
 import Toast from './components/Toast.jsx'
 import AdminDashboard, { POST_LOGIN_REDIRECT_KEY } from './components/AdminDashboard.jsx'
 import { supabase } from './supabaseClient.js'
@@ -23,6 +24,7 @@ const SHAPE_LABELS = { cube: 'Cubo', sphere: 'Esfera', cone: 'Prisma' }
 const STORAGE_KEY = 'altar-objects-v1'
 const PHOTO_KEY = 'altar-photo-v1'
 const CLOTH_COLOR_KEY = 'altar-cloth-color-v1'
+const ONBOARDING_KEY = 'altar-onboarded-v1'
 const DEFAULT_CLOTH_COLOR = '#f7f2e8'
 
 // Tope de objetos: cada uno con sombra cuesta hasta 4 draw calls (el pase
@@ -153,6 +155,18 @@ function AltarEditor() {
   const [snap, setSnap] = useState(false)
   const [menuOpen, setMenuOpen] = useState(true)
   const [aboutOpen, setAboutOpen] = useState(false)
+  // Bienvenida de primera visita: solo se muestra si nunca se cerró en
+  // este navegador (no depende de si ya hay objetos, por si vino de un
+  // altar restaurado o compartido con otro dispositivo).
+  const [showOnboarding, setShowOnboarding] = useState(() => !localStorage.getItem(ONBOARDING_KEY))
+  const dismissOnboarding = () => {
+    try {
+      localStorage.setItem(ONBOARDING_KEY, '1')
+    } catch {
+      // almacenamiento lleno o bloqueado: se ignora, solo vuelve a aparecer la próxima vez
+    }
+    setShowOnboarding(false)
+  }
   const focusRef = useRef(null) // lo llena AltarScene para centrar la cámara
 
   // Historial para Ctrl+Z / Ctrl+Shift+Z: pilas de snapshots de `objects`
@@ -529,6 +543,7 @@ function AltarEditor() {
       )}
 
       {aboutOpen && <AboutPanel onClose={() => setAboutOpen(false)} />}
+      {showOnboarding && <Onboarding onClose={dismissOnboarding} />}
 
       <Toast toast={toast} onClose={() => setToast(null)} />
 

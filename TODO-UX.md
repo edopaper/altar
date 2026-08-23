@@ -26,10 +26,10 @@ como prioridad.
       `window.confirm` (ver punto 5).
 
 ### 3. Onboarding de primera vez
-- [ ] Flag en `localStorage` (mismo patrón que `STORAGE_KEY`/`PHOTO_KEY`)
+- [x] Flag en `localStorage` (mismo patrón que `STORAGE_KEY`/`PHOTO_KEY`)
       para detectar primera visita.
-- [ ] Hint inicial no intrusivo (ej. tooltip o banner descartable) con lo
-      básico: mover cámara, agregar primer objeto, dónde está el menú.
+- [x] Modal descartable (`Onboarding.jsx`) con lo básico: mover cámara,
+      agregar primer objeto, mover/rotar/escalar, Ctrl+Z, compartir.
 
 ### 4. Feedback visual al agregar un objeto
 - [ ] Auto-seleccionar el objeto recién agregado (si no pasa ya) para que

@@ -536,6 +536,39 @@ details[open] > .category-header::before {
   color: #6f6690;
 }
 
+/* ---------- Bienvenida de primera visita ---------- */
+.onboarding-form {
+  width: 360px;
+  max-width: 90vw;
+  gap: 10px;
+}
+
+.onboarding-steps {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.onboarding-steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 12.5px;
+  color: #c9c2dd;
+  line-height: 1.5;
+}
+
+.onboarding-icon {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  color: #ffb347;
+}
+
 .btn:focus-visible,
 .model-btn:focus-visible,
 .object-item:focus-visible,
