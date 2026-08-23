@@ -32,10 +32,11 @@ como prioridad.
       agregar primer objeto, mover/rotar/escalar, Ctrl+Z, compartir.
 
 ### 4. Feedback visual al agregar un objeto
-- [ ] Auto-seleccionar el objeto recién agregado (si no pasa ya) para que
-      el gizmo lo señale.
-- [ ] Highlight/pulso breve en el objeto nuevo, por si queda fuera de
-      cuadro o detrás de otro.
+- [x] Auto-seleccionar el objeto recién agregado (ya estaba implementado
+      en `addShape`/`addModel`/`addPaper`/`duplicateObject`).
+- [x] Highlight/pulso breve en el objeto nuevo (`SpawnPulse` en
+      `AltarObject.jsx`, disparado por `justAddedId` en `App.jsx`), por si
+      queda fuera de cuadro o detrás de otro.
 
 ## Prioridad media
 

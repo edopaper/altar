@@ -271,6 +271,7 @@ export default function AltarScene({
   photo,
   objects,
   selectedId,
+  justAddedId = null,
   mode,
   snap,
   onSelect,
@@ -313,6 +314,7 @@ export default function AltarScene({
           key={obj.id}
           object={obj}
           selected={obj.id === selectedId}
+          justAdded={obj.id === justAddedId}
           mode={mode}
           snap={snap}
           onSelect={() => onSelect(obj.id)}

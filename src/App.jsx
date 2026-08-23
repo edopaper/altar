@@ -167,6 +167,18 @@ function AltarEditor() {
     }
     setShowOnboarding(false)
   }
+
+  // Id del último objeto agregado/duplicado: dispara un pulso breve sobre
+  // él (AltarObject.jsx) para que se note incluso si queda fuera de foco o
+  // detrás de otro objeto en escenas grandes.
+  const [justAddedId, setJustAddedId] = useState(null)
+  const justAddedTimerRef = useRef(null)
+  const markJustAdded = (id) => {
+    clearTimeout(justAddedTimerRef.current)
+    setJustAddedId(id)
+    justAddedTimerRef.current = setTimeout(() => setJustAddedId(null), 700)
+  }
+  useEffect(() => () => clearTimeout(justAddedTimerRef.current), [])
   const focusRef = useRef(null) // lo llena AltarScene para centrar la cámara
 
   // Historial para Ctrl+Z / Ctrl+Shift+Z: pilas de snapshots de `objects`
@@ -371,6 +383,7 @@ function AltarEditor() {
     pushHistory()
     setObjects((prev) => [...prev, obj])
     setSelectedId(obj.id)
+    markJustAdded(obj.id)
   }
 
   const addModel = (model) => {
@@ -389,6 +402,7 @@ function AltarEditor() {
     pushHistory()
     setObjects((prev) => [...prev, obj])
     setSelectedId(obj.id)
+    markJustAdded(obj.id)
   }
 
   const addPaper = (paper) => {
@@ -408,6 +422,7 @@ function AltarEditor() {
     pushHistory()
     setObjects((prev) => [...prev, obj])
     setSelectedId(obj.id)
+    markJustAdded(obj.id)
   }
 
   const updateObject = useCallback((id, patch) => {
@@ -439,6 +454,7 @@ function AltarEditor() {
     pushHistory()
     setObjects((prev) => [...prev, copy])
     setSelectedId(copy.id)
+    markJustAdded(copy.id)
   }
 
   const selectFromList = (id) => {
@@ -487,6 +503,7 @@ function AltarEditor() {
           clothColor={clothColor}
           objects={objects}
           selectedId={selectedId}
+          justAddedId={justAddedId}
           mode={mode}
           snap={snap}
           onSelect={setSelectedId}

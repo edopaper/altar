@@ -1,10 +1,33 @@
 import { Suspense, useRef } from 'react'
 import * as THREE from 'three'
+import { useFrame } from '@react-three/fiber'
 import { TransformControls, useHelper } from '@react-three/drei'
 import ModelLoader from './ModelLoader.jsx'
 import PaperCutout from './PaperCutout.jsx'
 
 const ROTATION_SNAP = THREE.MathUtils.degToRad(15)
+const SPAWN_PULSE_DURATION = 0.6 // segundos
+
+// Esfera de wireframe que se expande y se desvanece alrededor de un objeto
+// recién agregado/duplicado, para que se note incluso si queda fuera de
+// foco o detrás de otro objeto (App.jsx controla cuánto vive vía `justAdded`).
+function SpawnPulse() {
+  const ref = useRef()
+  const startRef = useRef(null)
+  useFrame(({ clock }) => {
+    if (startRef.current === null) startRef.current = clock.elapsedTime
+    const t = Math.min((clock.elapsedTime - startRef.current) / SPAWN_PULSE_DURATION, 1)
+    if (!ref.current) return
+    ref.current.scale.setScalar(0.3 + t * 1.4)
+    ref.current.material.opacity = 1 - t
+  })
+  return (
+    <mesh ref={ref}>
+      <sphereGeometry args={[0.35, 16, 16]} />
+      <meshBasicMaterial color="#ffb347" transparent opacity={1} wireframe depthWrite={false} />
+    </mesh>
+  )
+}
 
 function ShapeGeometry({ shapeKind }) {
   switch (shapeKind) {
@@ -32,7 +55,7 @@ function LoadingCube() {
  * Un objeto del altar: <group> transformable con la geometría o el modelo dentro.
  * Para pasar de placeholder a modelo final solo cambia lo que se renderiza aquí.
  */
-export default function AltarObject({ object, selected, mode, snap, onSelect, onTransform, orbitRef }) {
+export default function AltarObject({ object, selected, justAdded, mode, snap, onSelect, onTransform, orbitRef }) {
   const groupRef = useRef()
 
   // Highlight de selección: caja envolvente naranja alrededor del group.
@@ -82,6 +105,7 @@ export default function AltarObject({ object, selected, mode, snap, onSelect, on
         }}
       >
         {content}
+        {justAdded && <SpawnPulse />}
       </group>
 
       {selected && !object.locked && (
