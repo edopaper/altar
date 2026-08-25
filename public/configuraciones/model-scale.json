@@ -1,0 +1,77 @@
+{
+  "generatedAt": "2026-08-25T22:45:54.903Z",
+  "models": {
+    "otros/Incensario-optimized.glb": {
+      "scale": 1
+    },
+    "otros/cafe-optimized.glb": {
+      "scale": 1
+    },
+    "otros/calavera-azucar-optimized.glb": {
+      "scale": 1
+    },
+    "otros/calavera-chocolate-optimized.glb": {
+      "scale": 1
+    },
+    "otros/cañas-optimized.glb": {
+      "scale": 1
+    },
+    "otros/carene-asada-optimized.glb": {
+      "scale": 1
+    },
+    "otros/cerveza.glb": {
+      "scale": 1
+    },
+    "otros/chocolate-optimized.glb": {
+      "scale": 1
+    },
+    "otros/copal-optimized.glb": {
+      "scale": 1
+    },
+    "otros/cruz-ceniza-optimized.glb": {
+      "scale": 1
+    },
+    "otros/dulces-optimized.glb": {
+      "scale": 1
+    },
+    "otros/flor-cenpasuchil-optimized.glb": {
+      "scale": 1
+    },
+    "otros/frutas-optimized.glb": {
+      "scale": 1
+    },
+    "otros/jarra-agua-optimized.glb": {
+      "scale": 1
+    },
+    "otros/jarro-cencpasuchil-optimized.glb": {
+      "scale": 2
+    },
+    "otros/pan-muerto-optimized.glb": {
+      "scale": 1
+    },
+    "otros/papel-picado.pan-de-muerto-optimized.glb": {
+      "scale": 1
+    },
+    "otros/rosario-optimized.glb": {
+      "scale": 1
+    },
+    "otros/sal-optimized.glb": {
+      "scale": 1
+    },
+    "otros/tamales-optimized.glb": {
+      "scale": 1
+    },
+    "otros/tortillas-harina.glb": {
+      "scale": 1
+    },
+    "otros/vase-agua-optimized.glb": {
+      "scale": 1
+    },
+    "otros/veladora-optimized.glb": {
+      "scale": 1
+    },
+    "otros/velas.glb": {
+      "scale": 1
+    }
+  }
+}

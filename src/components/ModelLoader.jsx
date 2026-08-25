@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import * as THREE from 'three'
 import { useThree } from '@react-three/fiber'
 import { Clone, useGLTF } from '@react-three/drei'
@@ -31,6 +31,27 @@ function smoothTextures(root, maxAnisotropy) {
 // gigante ni microscópico. El usuario después lo reescala libremente.
 const TARGET_SIZE = 0.45
 
+// Multiplicador extra por modelo, generado por
+// scripts/generate-model-scale-config.mjs en public/configuraciones/model-scale.json.
+// Se cachea a nivel de módulo: todos los ModelLoader comparten un solo fetch.
+const SCALE_CONFIG_URL = '/configuraciones/model-scale.json'
+let scaleConfigPromise = null
+function loadScaleConfig() {
+  if (!scaleConfigPromise) {
+    scaleConfigPromise = fetch(SCALE_CONFIG_URL)
+      .then((res) => (res.ok ? res.json() : { models: {} }))
+      .then((data) => data.models ?? {})
+      .catch(() => ({}))
+  }
+  return scaleConfigPromise
+}
+
+function getConfiguredScale(modelPath, scaleConfig) {
+  const rel = modelPath.replace(/^\/models\/altar\//, '')
+  const scale = scaleConfig?.[rel]?.scale
+  return typeof scale === 'number' ? scale : 1
+}
+
 /**
  * Carga un .glb respetando sus materiales originales. La normalización de
  * escala vive en un group interno, así el scale del estado sigue siendo [1,1,1]
@@ -40,20 +61,32 @@ export default function ModelLoader({ path }) {
   const { scene } = useGLTF(path)
   const gl = useThree((state) => state.gl)
 
+  // null mientras carga: el primer render de cada sesión usa escala 1 hasta
+  // que llegue el JSON (se cachea, así que solo pasa una vez).
+  const [scaleConfig, setScaleConfig] = useState(null)
+  useEffect(() => {
+    let alive = true
+    loadScaleConfig().then((config) => alive && setScaleConfig(config))
+    return () => {
+      alive = false
+    }
+  }, [])
+
   useMemo(() => smoothTextures(scene, gl.capabilities.getMaxAnisotropy()), [scene, gl])
 
   const { factor, offsetY, topY } = useMemo(() => {
     const box = new THREE.Box3().setFromObject(scene)
     const size = box.getSize(new THREE.Vector3())
     const maxDim = Math.max(size.x, size.y, size.z) || 1
-    const f = TARGET_SIZE / maxDim
+    const configuredScale = getConfiguredScale(path, scaleConfig)
+    const f = (TARGET_SIZE / maxDim) * configuredScale
     // Apoya el modelo sobre su base (y=0 local) en lugar de su origen arbitrario.
     return { factor: f, offsetY: -box.min.y * f, topY: size.y * f }
-  }, [scene])
+  }, [scene, path, scaleConfig])
 
   // Los modelos de la carpeta de velas llevan flama parpadeante en la punta.
   // La flama va FUERA del group normalizado: las luces no escalan bien dentro.
-  const isCandle = path.includes('/velas-y-faroles/')
+  const isCandle = path.includes('/velas/')
 
   return (
     <>
