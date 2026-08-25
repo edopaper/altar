@@ -1,76 +1,94 @@
 {
-  "generatedAt": "2026-08-25T22:45:54.903Z",
+  "generatedAt": "2026-08-25T23:52:49.559Z",
   "models": {
-    "otros/Incensario-optimized.glb": {
+    "comida/cafe.glb": {
       "scale": 1
     },
-    "otros/cafe-optimized.glb": {
+    "comida/calavera-azucar.glb": {
       "scale": 1
     },
-    "otros/calavera-azucar-optimized.glb": {
+    "comida/calavera-chocolate.glb": {
       "scale": 1
     },
-    "otros/calavera-chocolate-optimized.glb": {
+    "comida/carene-asada.glb": {
       "scale": 1
     },
-    "otros/cañas-optimized.glb": {
+    "comida/cañas.glb": {
       "scale": 1
     },
-    "otros/carene-asada-optimized.glb": {
+    "comida/cerveza.glb": {
       "scale": 1
     },
-    "otros/cerveza.glb": {
+    "comida/chocolate.glb": {
       "scale": 1
     },
-    "otros/chocolate-optimized.glb": {
+    "comida/dulces.glb": {
       "scale": 1
     },
-    "otros/copal-optimized.glb": {
+    "comida/frutas.glb": {
       "scale": 1
     },
-    "otros/cruz-ceniza-optimized.glb": {
+    "comida/jarra-agua.glb": {
       "scale": 1
     },
-    "otros/dulces-optimized.glb": {
+    "comida/pan-muerto.glb": {
       "scale": 1
     },
-    "otros/flor-cenpasuchil-optimized.glb": {
+    "comida/sal.glb": {
       "scale": 1
     },
-    "otros/frutas-optimized.glb": {
+    "comida/tamales.glb": {
       "scale": 1
     },
-    "otros/jarra-agua-optimized.glb": {
+    "comida/tortillas-harina.glb": {
       "scale": 1
     },
-    "otros/jarro-cencpasuchil-optimized.glb": {
-      "scale": 2
-    },
-    "otros/pan-muerto-optimized.glb": {
+    "comida/vase-agua.glb": {
       "scale": 1
     },
-    "otros/papel-picado.pan-de-muerto-optimized.glb": {
+    "decoracion/cruz-ceniza.glb": {
       "scale": 1
     },
-    "otros/rosario-optimized.glb": {
+    "decoracion/flor-cenpasuchil.glb": {
       "scale": 1
     },
-    "otros/sal-optimized.glb": {
+    "decoracion/jarron-cencpasuchil.glb": {
       "scale": 1
     },
-    "otros/tamales-optimized.glb": {
+    "decoracion/papel-picado-angel.glb": {
+      "scale": 1.5
+    },
+    "decoracion/papel-picado-calavera.glb": {
+      "scale": 1.5
+    },
+    "decoracion/papel-picado-catrina.glb": {
+      "scale": 1.5
+    },
+    "decoracion/papel-picado-cenpasuchil.glb": {
+      "scale": 1.5
+    },
+    "decoracion/papel-picado-pan-de-muerto.glb": {
+      "scale": 1.5
+    },
+    "decoracion/papel-picado-perro.glb": {
+      "scale": 1.5
+    },
+    "decoracion/rosario.glb": {
       "scale": 1
     },
-    "otros/tortillas-harina.glb": {
+    "velas/copal.glb": {
       "scale": 1
     },
-    "otros/vase-agua-optimized.glb": {
+    "velas/incensario.glb": {
       "scale": 1
     },
-    "otros/veladora-optimized.glb": {
+    "velas/papel-vela.glb": {
+      "scale": 1.5
+    },
+    "velas/veladora.glb": {
       "scale": 1
     },
-    "otros/velas.glb": {
+    "velas/velas.glb": {
       "scale": 1
     }
   }
