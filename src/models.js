@@ -12,6 +12,7 @@ const globbed = import.meta.glob('/public/models/altar/**/*.glb', {
 const CATEGORY_LABELS = {
   altares: 'Altares',
   calabazas: 'Calabazas',
+  comida: 'Comida',
   criptas: 'Criptas',
   decoracion: 'Decoración',
   'muros-y-rejas': 'Muros y rejas',
@@ -20,7 +21,7 @@ const CATEGORY_LABELS = {
   pilares: 'Pilares',
   tumbas: 'Tumbas',
   varios: 'Varios',
-  'velas-y-faroles': 'Velas y faroles',
+  'velas': 'Velas',
 }
 
 function prettify(slug) {
