@@ -17,6 +17,8 @@ const TRACKS = Object.keys(globbed)
   .sort((a, b) => a.name.localeCompare(b.name))
 
 const DEFAULT_VOLUME = 0.6
+const VOLUME_KEY = 'altar-music-volume-v1'
+const TRACK_KEY = 'altar-music-track-v1'
 
 /**
  * Reproductor flotante sobre el canvas: reproduce todas las pistas de
@@ -25,12 +27,28 @@ const DEFAULT_VOLUME = 0.6
 export default function MusicPlayer() {
   const audioRef = useRef(null)
   const [playing, setPlaying] = useState(false)
-  const [trackIndex, setTrackIndex] = useState(0)
-  const [volume, setVolume] = useState(DEFAULT_VOLUME)
+  // No se persiste si estaba sonando: los navegadores bloquean el
+  // autoplay sin gesto del usuario, así que igual habría que tocar play.
+  const [trackIndex, setTrackIndex] = useState(() => {
+    const savedPath = localStorage.getItem(TRACK_KEY)
+    const i = TRACKS.findIndex((t) => t.path === savedPath)
+    return i >= 0 ? i : 0
+  })
+  const [volume, setVolume] = useState(() => {
+    const raw = localStorage.getItem(VOLUME_KEY)
+    if (raw === null) return DEFAULT_VOLUME
+    const saved = Number(raw)
+    return Number.isFinite(saved) && saved >= 0 && saved <= 1 ? saved : DEFAULT_VOLUME
+  })
 
   useEffect(() => {
     if (audioRef.current) audioRef.current.volume = volume
+    localStorage.setItem(VOLUME_KEY, String(volume))
   }, [volume])
+
+  useEffect(() => {
+    if (TRACKS[trackIndex]) localStorage.setItem(TRACK_KEY, TRACKS[trackIndex].path)
+  }, [trackIndex])
 
   // Cuando cambia la pista (React ya actualizó el src), se relanza el play.
   const playingRef = useRef(false)

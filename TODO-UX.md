@@ -58,8 +58,10 @@ como prioridad.
       estado `objects`). Se confirma con Enter/blur, Esc cancela.
 
 ### 8. Persistir estado del reproductor de música
-- [ ] Guardar volumen (y opcionalmente última pista) en `localStorage`
-      desde `MusicPlayer.jsx`, mismo patrón que el resto de la app.
+- [x] Guardar volumen y última pista en `localStorage` desde
+      `MusicPlayer.jsx` (`altar-music-volume-v1` / `altar-music-track-v1`).
+      No se persiste "sonando": los navegadores bloquean el autoplay sin
+      gesto del usuario, así que igual hay que tocar play de nuevo.
 
 ## Prioridad baja / nice-to-have
 
