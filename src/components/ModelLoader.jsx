@@ -8,7 +8,15 @@ const TEXTURE_SLOTS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMa
 
 // Kenney exporta sus paletas con filtro nearest (look pixelado intencional).
 // Se cambia a filtrado lineal con mipmaps y anisotropía para que se vean suaves.
+//
+// `scene` viene cacheado por useGLTF (una sola instancia compartida por path),
+// pero cada objeto colocado monta su propio ModelLoader: sin este set, el
+// traverse + `needsUpdate = true` se repetiría por cada instancia, re-subiendo
+// a la GPU las mismas texturas ya procesadas. Se marca por referencia de scene.
+const smoothedScenes = new WeakSet()
 function smoothTextures(root, maxAnisotropy) {
+  if (smoothedScenes.has(root)) return
+  smoothedScenes.add(root)
   root.traverse((node) => {
     if (!node.isMesh) return
     const materials = Array.isArray(node.material) ? node.material : [node.material]
@@ -91,7 +99,12 @@ export default function ModelLoader({ path }) {
   return (
     <>
       <group scale={factor} position={[0, offsetY, 0]}>
-        <Clone object={scene} castShadow receiveShadow deep />
+        {/* Sin `deep`: todas las instancias del mismo modelo comparten geometría
+            y material en vez de clonarlos (ningún modelo GLTF muta su material
+            por selección; eso solo pasa con las formas básicas). `dispose={null}`
+            evita que, al borrar una instancia, React Three Fiber libere el
+            recurso compartido y rompa las demás instancias que lo siguen usando. */}
+        <Clone object={scene} castShadow receiveShadow dispose={null} />
       </group>
       {isCandle && <CandleFlame position={[0, topY + 0.015, 0]} />}
     </>
