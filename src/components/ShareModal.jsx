@@ -74,21 +74,21 @@ export default function ShareModal({ url, note, onClose }) {
 
   return (
     <div className="message-overlay" onClick={onClose}>
-      <div className="message-form share-form" onClick={(e) => e.stopPropagation()}>
+      <div className="message-form publish-form" onClick={(e) => e.stopPropagation()}>
         <h2>Compartir altar</h2>
-        {note && <p className="share-note">{note}</p>}
+        {note && <p className="publish-note">{note}</p>}
 
         {canNativeShare && (
-          <button className="btn btn--block share-native-btn" onClick={nativeShare}>
+          <button className="btn btn--block publish-native-btn" onClick={nativeShare}>
             Compartir…
           </button>
         )}
 
-        <div className="share-networks">
+        <div className="publish-networks">
           {NETWORKS.map((n) => (
             <a
               key={n.id}
-              className="share-network-btn"
+              className="publish-network-btn"
               href={n.href(url)}
               target="_blank"
               rel="noopener noreferrer"
@@ -100,8 +100,8 @@ export default function ShareModal({ url, note, onClose }) {
           ))}
         </div>
 
-        <div className="share-link-row">
-          <input className="share-link-input" value={url} readOnly onFocus={(e) => e.target.select()} />
+        <div className="publish-link-row">
+          <input className="publish-link-input" value={url} readOnly onFocus={(e) => e.target.select()} />
           <button className="btn" onClick={copy}>
             {copied ? 'Copiado' : 'Copiar'}
           </button>

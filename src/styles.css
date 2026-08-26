@@ -798,29 +798,29 @@ details[open] > .category-header::before {
 }
 
 /* ---------- Modal de compartir ---------- */
-.share-form {
+.publish-form {
   width: 340px;
   max-width: 90vw;
 }
 
-.share-note {
+.publish-note {
   font-size: 12px;
   color: #c9c2dd;
   line-height: 1.4;
 }
 
-.share-native-btn {
+.publish-native-btn {
   background: rgba(255, 170, 85, 0.18);
   border-color: #ffb347;
   color: #ffb347;
 }
 
-.share-networks {
+.publish-networks {
   display: flex;
   gap: 8px;
 }
 
-.share-network-btn {
+.publish-network-btn {
   flex: 1;
   display: flex;
   align-items: center;
@@ -834,17 +834,17 @@ details[open] > .category-header::before {
   cursor: pointer;
 }
 
-.share-network-btn:hover {
+.publish-network-btn:hover {
   background: rgba(255, 170, 85, 0.15);
   color: #ffb347;
 }
 
-.share-link-row {
+.publish-link-row {
   display: flex;
   gap: 6px;
 }
 
-.share-link-input {
+.publish-link-input {
   flex: 1;
   min-width: 0;
   box-sizing: border-box;
@@ -856,7 +856,7 @@ details[open] > .category-header::before {
   background: rgba(138, 127, 181, 0.08);
 }
 
-.share-link-input:focus {
+.publish-link-input:focus {
   outline: none;
   border-color: rgba(255, 170, 85, 0.5);
 }
@@ -891,7 +891,7 @@ details[open] > .category-header::before {
   pointer-events: none;
 }
 
-.share-btn {
+.publish-btn {
   bottom: 134px;
 }
 

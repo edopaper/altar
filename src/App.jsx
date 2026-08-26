@@ -600,7 +600,7 @@ function AltarEditor() {
         </svg>
       </button>
       <button
-        className="capture-btn share-btn"
+        className="capture-btn publish-btn"
         onClick={shareAltar}
         disabled={(objects.length === 0 && !photo) || isSharing}
         title={isSharing ? 'Compartiendo…' : 'Compartir altar'}
