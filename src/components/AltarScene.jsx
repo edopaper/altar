@@ -185,6 +185,9 @@ function CeremonialLights() {
         shadow-normalBias={0.04}
       />
       {/* Velas / puntos ámbar */}
+      {/* Point lights: la sombra es un cubemap (6 caras), así que el costo real
+          en memoria es 6x el de una sombra direccional del mismo tamaño —
+          512 alcanza de sobra a la distancia en que se ven estas velas. */}
       <pointLight
         color="#ffb877"
         intensity={2}
@@ -192,7 +195,7 @@ function CeremonialLights() {
         decay={2}
         position={[-1.8, 1.6, -1.4]}
         castShadow
-        shadow-mapSize={[1024, 1024]}
+        shadow-mapSize={[512, 512]}
         shadow-bias={-0.0002}
         shadow-normalBias={0.04}
       />
@@ -203,7 +206,7 @@ function CeremonialLights() {
         decay={2}
         position={[1.8, 1.6, -1.4]}
         castShadow
-        shadow-mapSize={[1024, 1024]}
+        shadow-mapSize={[512, 512]}
         shadow-bias={-0.0002}
         shadow-normalBias={0.04}
       />
