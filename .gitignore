@@ -31,3 +31,4 @@ pnpm-debug.log*
 # macOS
 .DS_Store
 .vercel
+check_heap.mjs
