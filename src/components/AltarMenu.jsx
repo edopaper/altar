@@ -15,17 +15,17 @@ function normalize(s) {
     .toLowerCase()
 }
 
-// Botón de modelo con preview: si el thumbnail (generado por
+// Botón de decoración con preview: si el thumbnail (generado por
 // scripts/generate-thumbnails.mjs) todavía no existe, la imagen falla en
 // silencio y el botón cae de vuelta a mostrar solo el nombre.
-function ModelThumbButton({ model, onClick }) {
+function DecorThumbButton({ item }) {
   const [broken, setBroken] = useState(false)
   return (
-    <button className="model-btn" onClick={onClick} title={model.name}>
+    <button className="model-btn" onClick={item.add} title={`Agregar ${item.name} al altar`}>
       {!broken && (
-        <img className="model-thumb" src={model.thumbnail} alt="" loading="lazy" onError={() => setBroken(true)} />
+        <img className="model-thumb" src={item.thumb} alt="" loading="lazy" onError={() => setBroken(true)} />
       )}
-      <span className="model-btn-label">{model.name}</span>
+      <span className="model-btn-label">{item.name}</span>
     </button>
   )
 }
@@ -66,7 +66,6 @@ function RenameField({ id, name, onRename }) {
 }
 
 export default function AltarMenu({
-  models,
   categories,
   objects,
   selected,
@@ -100,18 +99,36 @@ export default function AltarMenu({
   onShowAbout,
 }) {
   const [decorQuery, setDecorQuery] = useState('')
+  // Chip de categoría activo: 'all' muestra todo el catálogo agrupado.
+  const [activeGroup, setActiveGroup] = useState('all')
   const decorSearch = normalize(decorQuery.trim())
   const isSearching = decorSearch.length > 0
 
-  const filteredPapers = isSearching
-    ? papers.filter((p) => normalize(p.name).includes(decorSearch))
-    : papers
-  const filteredCategories = isSearching
-    ? categories
-        .map((cat) => ({ ...cat, models: cat.models.filter((m) => normalize(m.name).includes(decorSearch)) }))
-        .filter((cat) => cat.models.length > 0)
-    : categories
-  const hasDecorResults = filteredPapers.length > 0 || filteredCategories.length > 0
+  // Catálogo unificado (papel picado + modelos) en grupos con la misma
+  // forma, para renderizar chips y cuadrículas de manera homogénea.
+  const decorGroups = [
+    {
+      id: 'papel',
+      label: 'Papel picado',
+      items: papers.map((p) => ({ key: p.path, thumb: p.path, name: p.name, add: () => onAddPaper(p) })),
+    },
+    ...categories.map((cat) => ({
+      id: cat.category,
+      label: cat.category,
+      items: cat.models.map((m) => ({ key: m.path, thumb: m.thumbnail, name: m.name, add: () => onAddModel(m) })),
+    })),
+  ]
+  const totalDecor = decorGroups.reduce((n, g) => n + g.items.length, 0)
+
+  // Al buscar se recorre todo el catálogo (el chip activo se ignora para no
+  // esconder resultados); sin búsqueda, el chip decide qué grupos se ven.
+  const visibleGroups = decorGroups
+    .filter((g) => isSearching || activeGroup === 'all' || g.id === activeGroup)
+    .map((g) =>
+      isSearching ? { ...g, items: g.items.filter((it) => normalize(it.name).includes(decorSearch)) } : g,
+    )
+    .filter((g) => g.items.length > 0)
+  const hasDecorResults = visibleGroups.length > 0
 
   return (
     <aside className="menu">
@@ -130,6 +147,25 @@ export default function AltarMenu({
         <h2>
           Objetos en escena ({objects.length}/{maxObjects})
         </h2>
+        <div
+          className="quota-bar"
+          role="progressbar"
+          aria-label="Cupo de objetos usado"
+          aria-valuemin={0}
+          aria-valuemax={maxObjects}
+          aria-valuenow={objects.length}
+        >
+          <div
+            className={`quota-bar-fill ${
+              objects.length >= maxObjects
+                ? 'quota-bar-fill--danger'
+                : objects.length >= objectsWarningAt
+                  ? 'quota-bar-fill--warn'
+                  : ''
+            }`}
+            style={{ width: `${Math.min(100, (objects.length / maxObjects) * 100)}%` }}
+          />
+        </div>
         {objects.length === 0 && <div className="menu-empty">Aún no hay objetos</div>}
         {objects.length >= maxObjects ? (
           <div className="menu-note menu-note--danger">
@@ -235,16 +271,8 @@ export default function AltarMenu({
       )}
 
       <section className="menu-section">
-        <h2>Agregar objeto</h2>
-        <div className="menu-label">Forma básica</div>
-        <div className="shape-row">
-          {SHAPES.map((s) => (
-            <button key={s.kind} className="btn" onClick={() => onAddShape(s.kind)}>
-              {s.label}
-            </button>
-          ))}
-        </div>
-        <div className="menu-label">Decoración ({models.length + papers.length})</div>
+        <h2>Decoración ({totalDecor})</h2>
+        <div className="menu-note decor-hint">Toca una miniatura para sumarla al altar.</div>
         <input
           type="search"
           className="decor-search"
@@ -252,36 +280,50 @@ export default function AltarMenu({
           value={decorQuery}
           onChange={(e) => setDecorQuery(e.target.value)}
         />
-        <div className="category-list">
+        <div className="decor-chips" aria-label="Categorías de decoración">
+          <button
+            className={`decor-chip ${activeGroup === 'all' && !isSearching ? 'decor-chip--active' : ''}`}
+            aria-pressed={activeGroup === 'all' && !isSearching}
+            onClick={() => setActiveGroup('all')}
+            disabled={isSearching}
+          >
+            Todo
+          </button>
+          {decorGroups.map((g) => (
+            <button
+              key={g.id}
+              className={`decor-chip ${activeGroup === g.id && !isSearching ? 'decor-chip--active' : ''}`}
+              aria-pressed={activeGroup === g.id && !isSearching}
+              onClick={() => setActiveGroup(g.id)}
+              disabled={isSearching}
+            >
+              {g.label} <span className="decor-chip-count">{g.items.length}</span>
+            </button>
+          ))}
+        </div>
+        <div className="decor-groups">
           {!hasDecorResults && (
             <div className="menu-empty">Sin resultados para «{decorQuery.trim()}»</div>
           )}
-          {filteredPapers.length > 0 && (
-            <details className="category" open={isSearching || undefined}>
-              <summary className="category-header">
-                Papel picado <span className="category-count">{filteredPapers.length}</span>
-              </summary>
+          {visibleGroups.map((g) => (
+            <div key={g.id}>
+              {(isSearching || activeGroup === 'all') && (
+                <div className="decor-group-label">{g.label}</div>
+              )}
               <div className="model-grid">
-                {filteredPapers.map((p) => (
-                  <button key={p.path} className="model-btn" onClick={() => onAddPaper(p)} title={p.name}>
-                    <img className="model-thumb" src={p.path} alt="" loading="lazy" />
-                    <span className="model-btn-label">{p.name}</span>
-                  </button>
+                {g.items.map((it) => (
+                  <DecorThumbButton key={it.key} item={it} />
                 ))}
               </div>
-            </details>
-          )}
-          {filteredCategories.map((cat) => (
-            <details key={cat.category} className="category" open={isSearching || undefined}>
-              <summary className="category-header">
-                {cat.category} <span className="category-count">{cat.models.length}</span>
-              </summary>
-              <div className="model-grid">
-                {cat.models.map((m) => (
-                  <ModelThumbButton key={m.path} model={m} onClick={() => onAddModel(m)} />
-                ))}
-              </div>
-            </details>
+            </div>
+          ))}
+        </div>
+        <div className="menu-label">Forma básica</div>
+        <div className="shape-row">
+          {SHAPES.map((s) => (
+            <button key={s.kind} className="btn" onClick={() => onAddShape(s.kind)}>
+              {s.label}
+            </button>
           ))}
         </div>
       </section>

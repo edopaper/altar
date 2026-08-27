@@ -9,6 +9,7 @@ import ThumbnailStage from './components/ThumbnailStage.jsx'
 import AboutPanel from './components/AboutPanel.jsx'
 import Onboarding from './components/Onboarding.jsx'
 import ShareModal from './components/ShareModal.jsx'
+import SharePreviewModal from './components/SharePreviewModal.jsx'
 import Toast from './components/Toast.jsx'
 import AdminDashboard, { POST_LOGIN_REDIRECT_KEY } from './components/AdminDashboard.jsx'
 import { supabase } from './supabaseClient.js'
@@ -262,6 +263,9 @@ function AltarEditor() {
   const [isSharing, setIsSharing] = useState(false)
   // Modal de compartir (redes sociales + link): null mientras está cerrado.
   const [shareInfo, setShareInfo] = useState(null)
+  // Captura (data URL) mostrada en el modal de confirmación previo a
+  // compartir: null mientras está cerrado.
+  const [sharePreview, setSharePreview] = useState(null)
   const [toast, setToast] = useState(null)
   const toastTimerRef = useRef(null)
   // Último altar compartido con éxito: si al tocar "Compartir" de nuevo el
@@ -271,9 +275,9 @@ function AltarEditor() {
   // sobreviva a un reload, no solo dentro de la misma sesión.
   const lastSharedRef = useRef(loadLastShare())
 
-  const showToast = useCallback((message, type = 'info', duration = 5000) => {
+  const showToast = useCallback((message, type = 'info', duration = 5000, action = null) => {
     clearTimeout(toastTimerRef.current)
-    setToast({ message, type })
+    setToast({ message, type, action })
     toastTimerRef.current = setTimeout(() => setToast(null), duration)
   }, [])
   useEffect(() => () => clearTimeout(toastTimerRef.current), [])
@@ -307,6 +311,14 @@ function AltarEditor() {
   const removePhoto = () => {
     setPhoto(null)
     localStorage.removeItem(PHOTO_KEY)
+  }
+
+  // Paso previo a compartir: muestra una captura de la escena para
+  // confirmar el encuadre antes de publicar. Recién al confirmar se llama
+  // a shareAltar (y por lo tanto a la Edge Function).
+  const requestShare = () => {
+    if (isSharing) return
+    withCleanCanvas((canvas) => setSharePreview(canvas.toDataURL('image/jpeg', 0.8)))
   }
 
   // Publica un snapshot del altar bajo un slug y abre el modal de
@@ -347,28 +359,41 @@ function AltarEditor() {
     }
   }
 
-  // Captura la escena como PNG: deselecciona (para que no salga el gizmo),
-  // espera a que se pinte el siguiente frame y descarga el canvas.
-  const captureScreenshot = () => {
+  // Deselecciona (para que no salga el gizmo en la imagen), espera a que se
+  // pinte el siguiente frame y entrega el canvas listo para capturar. Lo
+  // comparten la descarga de PNG y el preview previo a compartir.
+  const withCleanCanvas = (fn) => {
     setSelectedIds([])
     requestAnimationFrame(() =>
       requestAnimationFrame(() => {
         const canvas = document.querySelector('canvas')
-        if (!canvas) return
-        const link = document.createElement('a')
-        link.download = `altar-${new Date().toISOString().slice(0, 10)}.png`
-        link.href = canvas.toDataURL('image/png')
-        link.click()
+        if (canvas) fn(canvas)
       }),
     )
   }
 
+  // Captura la escena como PNG y la descarga.
+  const captureScreenshot = () => {
+    withCleanCanvas((canvas) => {
+      const link = document.createElement('a')
+      link.download = `altar-${new Date().toISOString().slice(0, 10)}.png`
+      link.href = canvas.toDataURL('image/png')
+      link.click()
+    })
+  }
+
+  // Sin confirm() bloqueante: limpia al instante y ofrece "Deshacer" en un
+  // toast (misma política que eliminar un objeto individual, que tampoco
+  // pide confirmación porque todo pasa por el historial de Ctrl+Z).
   const clearAltar = () => {
     if (objects.length === 0) return
-    if (!window.confirm('¿Quitar todos los objetos del altar? Podés deshacerlo con Ctrl+Z.')) return
     pushHistory()
     setObjects([])
     setSelectedIds([])
+    showToast('Se quitaron todos los objetos del altar.', 'info', 8000, {
+      label: 'Deshacer',
+      onClick: undo,
+    })
   }
 
   // Tope compartido por las cuatro formas de sumar objetos (forma, modelo,
@@ -625,7 +650,6 @@ function AltarEditor() {
       {menuOpen && (
       <AltarMenu
         onHide={() => setMenuOpen(false)}
-        models={MODEL_LIST}
         categories={MODEL_CATEGORIES}
         objects={objects}
         selected={selected}
@@ -664,6 +688,16 @@ function AltarEditor() {
       {shareInfo && (
         <ShareModal url={shareInfo.url} note={shareInfo.note} onClose={() => setShareInfo(null)} />
       )}
+      {sharePreview && (
+        <SharePreviewModal
+          image={sharePreview}
+          onConfirm={() => {
+            setSharePreview(null)
+            shareAltar()
+          }}
+          onClose={() => setSharePreview(null)}
+        />
+      )}
 
       <Toast toast={toast} onClose={() => setToast(null)} />
 
@@ -691,7 +725,7 @@ function AltarEditor() {
       </button>
       <button
         className="capture-btn publish-btn"
-        onClick={shareAltar}
+        onClick={requestShare}
         disabled={(objects.length === 0 && !photo) || isSharing}
         title={isSharing ? 'Compartiendo…' : 'Compartir altar'}
         aria-label={isSharing ? 'Compartiendo…' : 'Compartir altar'}

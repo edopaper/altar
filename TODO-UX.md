@@ -8,10 +8,11 @@ como prioridad.
 ## Prioridad alta (mayor impacto, menor esfuerzo)
 
 ### 1. Buscador en "Decoración"
-- [x] Input de texto arriba de `.category-list` en `AltarMenu.jsx` que
-      filtre modelos y papel picado por nombre.
-- [x] Auto-expandir (`open`) las categorías que tengan al menos un match
-      mientras se escribe; colapsar el resto.
+- [x] Input de texto en `AltarMenu.jsx` que filtre modelos y papel picado
+      por nombre.
+- [x] ~~Auto-expandir (`open`) las categorías con match~~ Superado por el
+      punto 13: ya no hay acordeones; al buscar se muestra la cuadrícula
+      plana con los matches de todo el catálogo, agrupados por etiqueta.
 - [x] Estado vacío ("Sin resultados para «...»") si ningún modelo matchea.
 
 ### 2. Undo (Ctrl+Z) para mover/borrar/agregar
@@ -21,9 +22,9 @@ como prioridad.
       existen (G/R/S/Esc).
 - [x] Botones ↶/↷ en la toolbar flotante (`TransformToolbar.jsx`) para
       quien no tiene teclado (mobile) o no conoce el atajo.
-- [ ] Una vez que exista undo, reevaluar si "Eliminar" un objeto individual
+- [x] Una vez que exista undo, reevaluar si "Eliminar" un objeto individual
       necesita seguir sin confirmación, o si "Limpiar altar" puede perder su
-      `window.confirm` (ver punto 5).
+      `window.confirm` (ver punto 5). Resuelto en el punto 5.
 
 ### 3. Onboarding de primera vez
 - [x] Flag en `localStorage` (mismo patrón que `STORAGE_KEY`/`PHOTO_KEY`)
@@ -41,10 +42,12 @@ como prioridad.
 ## Prioridad media
 
 ### 5. Confirmaciones consistentes al eliminar
-- [ ] Decidir una sola política para "Eliminar objeto" vs "Limpiar altar"
-      (hoy solo "Limpiar altar" tiene `window.confirm`).
-- [ ] Si hay undo (punto 2), evaluar sacar el `confirm()` de "Limpiar
-      altar" también, o reemplazarlo por un toast con "Deshacer".
+- [x] Decidir una sola política para "Eliminar objeto" vs "Limpiar altar":
+      ninguna acción pide confirmación bloqueante; todo pasa por el
+      historial de Ctrl+Z.
+- [x] "Limpiar altar" ya no usa `confirm()`: limpia al instante y muestra
+      un toast con botón "Deshacer" (Toast.jsx ahora soporta una acción
+      opcional).
 
 ### 6. Duplicar con offset visible
 - [x] `duplicateObject` en `App.jsx`: aplicar un pequeño desplazamiento
@@ -66,10 +69,10 @@ como prioridad.
 ## Prioridad baja / nice-to-have
 
 ### 9. Preview antes de compartir
-- [ ] Reusar `captureScreenshot` para mostrar la imagen capturada en un
-      modal de confirmación ("¿Así se ve? Compartir / Cancelar") antes de
-      llamar a `shareAltar`, ya que ambos botones están uno al lado del
-      otro en el viewport.
+- [x] Reusar la captura de canvas (helper `withCleanCanvas`, compartido con
+      `captureScreenshot`) para mostrar la imagen en un modal de
+      confirmación (`SharePreviewModal.jsx`: "¿Así se ve tu altar?
+      Compartir / Cancelar") antes de llamar a `shareAltar`.
 
 ### 10. Centrar cámara en el objeto seleccionado ("foco")
 - [x] Atajo F que reutiliza `focusRef` (el mismo mecanismo que ya usaba
@@ -79,8 +82,10 @@ como prioridad.
       OrbitControls; si hace falta acercar también, es un paso aparte.
 
 ### 11. Indicador continuo de cupo de objetos
-- [ ] Barra de progreso sutil y persistente junto a "Objetos en escena
-      (n/max)" en vez de esperar al umbral `objectsWarningAt` para avisar.
+- [x] Barra de progreso sutil y persistente (`.quota-bar` en
+      `AltarMenu.jsx`) bajo "Objetos en escena (n/max)"; cambia a ámbar al
+      pasar `objectsWarningAt` y a rojo al llegar al máximo. Las notas de
+      texto de advertencia se mantienen.
 
 ### 12. Modal de compartir con redes sociales
 - [x] `ShareModal.jsx`: reemplaza el toast de "enlace copiado" por un modal
@@ -91,3 +96,16 @@ como prioridad.
       teléfono (incluye apps instaladas, no solo las 4 fijas).
 - [x] El link se sigue copiando al portapapeles en segundo plano al abrir
       el modal (best-effort, no bloquea si el navegador lo rechaza).
+
+### 13. Catálogo de decoración visible (descubribilidad)
+Problema: la decoración (30 objetos, lo más rico del catálogo) vivía en
+acordeones colapsados y debajo de "Forma básica", así que las miniaturas
+nunca se veían sin hacer clic.
+- [x] Sección propia "Decoración (n)" arriba, con hint "Toca una miniatura
+      para sumarla al altar"; "Forma básica" demovida al final.
+- [x] Chips de categoría (Todo / Papel picado / Comida / Decoración /
+      Velas, con contadores) en vez de acordeones `<details>`.
+- [x] Cuadrícula de miniaturas siempre visible (`.decor-groups`,
+      scrollable); con "Todo" o buscando, los grupos se separan con
+      etiquetas. El buscador ignora el chip activo para no esconder
+      resultados (los chips se deshabilitan mientras se escribe).

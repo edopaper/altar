@@ -191,6 +191,16 @@ canvas {
   background: rgba(255, 90, 90, 0.25);
 }
 
+.btn--primary {
+  border-color: #ffb347;
+  background: rgba(255, 170, 85, 0.25);
+  color: #ffcf8a;
+}
+
+.btn--primary:hover {
+  background: rgba(255, 170, 85, 0.4);
+}
+
 .btn--block {
   width: 100%;
   margin-top: 8px;
@@ -236,6 +246,23 @@ canvas {
   overflow-wrap: anywhere;
 }
 
+.toast-action {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid rgba(255, 170, 85, 0.5);
+  border-radius: 6px;
+  background: rgba(255, 170, 85, 0.15);
+  color: #ffb347;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.toast-action:hover {
+  background: rgba(255, 170, 85, 0.3);
+}
+
 .toast-close {
   flex-shrink: 0;
   background: none;
@@ -256,6 +283,30 @@ canvas {
   font-size: 10.5px;
   color: #6f6690;
   margin-top: 6px;
+}
+
+/* Barra sutil y persistente del cupo de objetos (n/max) */
+.quota-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  margin: 4px 0 8px;
+}
+
+.quota-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: rgba(255, 170, 85, 0.55);
+  transition: width 0.25s ease;
+}
+
+.quota-bar-fill--warn {
+  background: #ffc670;
+}
+
+.quota-bar-fill--danger {
+  background: #ff8a8a;
 }
 
 .menu-note--warn {
@@ -300,77 +351,81 @@ canvas {
   font-weight: 600;
 }
 
-.category-list {
+.decor-hint {
+  margin: -4px 0 6px;
+}
+
+/* Chips de categoría: filtran la cuadrícula siempre visible de abajo */
+.decor-chips {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
-  max-height: 300px;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.decor-chip {
+  padding: 3px 9px;
+  font-size: 11px;
+  border: 1px solid rgba(138, 127, 181, 0.35);
+  border-radius: 999px;
+  background: rgba(138, 127, 181, 0.08);
+  color: #cfc8e8;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.decor-chip:hover:not(:disabled) {
+  background: rgba(138, 127, 181, 0.25);
+}
+
+.decor-chip:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.decor-chip--active {
+  border-color: #ffb347;
+  background: rgba(255, 170, 85, 0.18);
+  color: #ffcf8a;
+}
+
+.decor-chip-count {
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.decor-groups {
+  max-height: 320px;
   overflow-y: auto;
   padding-right: 4px;
   scrollbar-width: thin;
   scrollbar-color: rgba(138, 127, 181, 0.4) transparent;
 }
 
-.category-list::-webkit-scrollbar,
+.decor-groups::-webkit-scrollbar,
 .object-list::-webkit-scrollbar {
   width: 6px;
 }
 
-.category-list::-webkit-scrollbar-thumb,
+.decor-groups::-webkit-scrollbar-thumb,
 .object-list::-webkit-scrollbar-thumb {
   background: rgba(138, 127, 181, 0.35);
   border-radius: 3px;
 }
 
-.category-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 8px;
-  font-size: 12px;
-  color: #cfc8e8;
-  border: 1px solid rgba(138, 127, 181, 0.25);
-  border-radius: 5px;
-  background: rgba(138, 127, 181, 0.08);
-  cursor: pointer;
-  user-select: none;
-  list-style: none;
-}
-
-.category-header::-webkit-details-marker {
-  display: none;
-}
-
-.category-header::before {
-  content: '▸';
-  margin-right: 6px;
-  font-size: 10px;
+.decor-group-label {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   color: #8a7fb5;
-  transition: transform 0.15s;
-}
-
-details[open] > .category-header::before {
-  transform: rotate(90deg);
-}
-
-.category-header:hover {
-  background: rgba(138, 127, 181, 0.2);
-}
-
-.category-count {
-  font-size: 10px;
-  color: #8a7fb5;
-  border: 1px solid rgba(138, 127, 181, 0.35);
-  border-radius: 8px;
-  padding: 0 6px;
-  margin-left: auto;
+  margin-bottom: 2px;
 }
 
 .model-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 5px;
-  padding: 5px 0 8px 10px;
+  padding: 5px 0 8px;
 }
 
 .model-btn {
@@ -581,7 +636,7 @@ details[open] > .category-header::before {
 .lock-btn:focus-visible,
 .menu-hide-btn:focus-visible,
 .menu-show-btn:focus-visible,
-.category-header:focus-visible {
+.decor-chip:focus-visible {
   outline: 2px solid #ffb347;
   outline-offset: 2px;
 }
@@ -807,6 +862,15 @@ details[open] > .category-header::before {
   font-size: 12px;
   color: #c9c2dd;
   line-height: 1.4;
+}
+
+/* Captura mostrada en el modal de confirmación previo a compartir */
+.share-preview-img {
+  display: block;
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 170, 85, 0.25);
+  margin: 8px 0;
 }
 
 .publish-native-btn {
