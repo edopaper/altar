@@ -166,7 +166,7 @@ export default function AltarViewer({ slug }) {
           photo={data.photo}
           clothColor={data.clothColor}
           objects={data.objects}
-          selectedId={null}
+          selectedIds={[]}
           mode="translate"
           snap={false}
           onSelect={noop}

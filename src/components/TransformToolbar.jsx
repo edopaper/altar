@@ -4,7 +4,16 @@ const MODES = [
   { id: 'scale', label: 'Escalar', key: 'S' },
 ]
 
-export default function TransformToolbar({ mode, onModeChange, hasSelection, canUndo, canRedo, onUndo, onRedo }) {
+export default function TransformToolbar({
+  mode,
+  onModeChange,
+  hasSelection,
+  multiSelect = false,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
+}) {
   return (
     <div className="toolbar-group">
       <div className="toolbar toolbar--history">
@@ -34,16 +43,23 @@ export default function TransformToolbar({ mode, onModeChange, hasSelection, can
         </button>
       </div>
       <div className={`toolbar ${hasSelection ? '' : 'toolbar--dim'}`}>
-        {MODES.map((m) => (
-          <button
-            key={m.id}
-            className={`toolbar-btn ${mode === m.id ? 'toolbar-btn--active' : ''}`}
-            onClick={() => onModeChange(m.id)}
-            title={`Atajo: ${m.key}`}
-          >
-            {m.label} <span className="toolbar-key">{m.key}</span>
-          </button>
-        ))}
+        {MODES.map((m) => {
+          // Con varios objetos seleccionados el gizmo compartido solo mueve
+          // (ver GroupTransformControls en AltarScene.jsx): Rotar/Escalar se
+          // deshabilitan para no sugerir algo que no hace nada.
+          const disabled = multiSelect && m.id !== 'translate'
+          return (
+            <button
+              key={m.id}
+              className={`toolbar-btn ${mode === m.id ? 'toolbar-btn--active' : ''}`}
+              onClick={() => onModeChange(m.id)}
+              disabled={disabled}
+              title={disabled ? 'No disponible con varios objetos seleccionados' : `Atajo: ${m.key}`}
+            >
+              {m.label} <span className="toolbar-key">{m.key}</span>
+            </button>
+          )
+        })}
       </div>
     </div>
   )

@@ -55,10 +55,22 @@ function LoadingCube() {
  * Un objeto del altar: <group> transformable con la geometría o el modelo dentro.
  * Para pasar de placeholder a modelo final solo cambia lo que se renderiza aquí.
  */
-export default function AltarObject({ object, selected, justAdded, mode, snap, onSelect, onTransform, orbitRef }) {
+export default function AltarObject({
+  object,
+  selected,
+  showGizmo,
+  justAdded,
+  mode,
+  snap,
+  onSelect,
+  onTransform,
+  orbitRef,
+}) {
   const groupRef = useRef()
 
   // Highlight de selección: caja envolvente naranja alrededor del group.
+  // Se muestra en todos los objetos seleccionados, aunque el gizmo (abajo)
+  // solo aparezca cuando hay uno solo seleccionado.
   useHelper(selected ? groupRef : false, THREE.BoxHelper, '#ffb347')
 
   const commitTransform = () => {
@@ -101,14 +113,19 @@ export default function AltarObject({ object, selected, justAdded, mode, snap, o
           // Un objeto bloqueado ignora el clic (no se selecciona por accidente)
           if (object.locked) return
           e.stopPropagation()
-          onSelect()
+          // Shift/Ctrl/Cmd+clic suma o quita este objeto de la selección
+          // actual en vez de reemplazarla (selección múltiple).
+          onSelect(e.shiftKey || e.ctrlKey || e.metaKey)
         }}
       >
         {content}
         {justAdded && <SpawnPulse />}
       </group>
 
-      {selected && !object.locked && (
+      {/* Con selección múltiple el movimiento lo maneja un solo gizmo
+          compartido en AltarScene (GroupTransformControls); acá solo se
+          muestra cuando este es el único objeto seleccionado. */}
+      {selected && showGizmo && !object.locked && (
         <TransformControls
           object={groupRef}
           mode={mode}

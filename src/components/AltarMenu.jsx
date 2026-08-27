@@ -70,6 +70,8 @@ export default function AltarMenu({
   categories,
   objects,
   selected,
+  selectedIds = [],
+  selectedObjects = [],
   snap,
   mode,
   onAddShape,
@@ -81,6 +83,8 @@ export default function AltarMenu({
   onColorChange,
   onDuplicate,
   onDelete,
+  onDuplicateSelected,
+  onDeleteSelected,
   onRename,
   onToggleSnap,
   onClearAltar,
@@ -138,12 +142,17 @@ export default function AltarMenu({
             </div>
           )
         )}
+        {selectedIds.length > 1 && (
+          <div className="menu-note">
+            {selectedIds.length} objetos seleccionados. Shift/Ctrl/Cmd+clic para sumar o quitar de la selección.
+          </div>
+        )}
         <ul className="object-list">
           {objects.map((o) => (
             <li key={o.id} className="object-row">
               <button
-                className={`object-item ${selected?.id === o.id ? 'object-item--active' : ''}`}
-                onClick={() => onSelectObject(o.id)}
+                className={`object-item ${selectedIds.includes(o.id) ? 'object-item--active' : ''}`}
+                onClick={(e) => onSelectObject(o.id, e.shiftKey || e.ctrlKey || e.metaKey)}
               >
                 <span className="object-dot" style={{ background: o.type !== 'model' ? o.color : '#8a7fb5' }} />
                 {o.name}
@@ -172,6 +181,25 @@ export default function AltarMenu({
           ))}
         </ul>
       </section>
+
+      {selectedIds.length > 1 && (
+        <section className="menu-section menu-section--active">
+          <h2>{selectedIds.length} seleccionados</h2>
+          <div className="menu-note">
+            Arrastra el gizmo en la escena para moverlos juntos, manteniendo sus posiciones relativas.
+          </div>
+          <div className="shape-row">
+            <button className="btn" onClick={onDuplicateSelected}>Duplicar todos</button>
+            <button
+              className="btn btn--danger"
+              onClick={onDeleteSelected}
+              disabled={selectedObjects.every((o) => o.locked)}
+            >
+              Eliminar todos
+            </button>
+          </div>
+        </section>
+      )}
 
       {selected && (
         <section className="menu-section menu-section--active">

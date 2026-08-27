@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { OrbitControls } from '@react-three/drei'
+import { OrbitControls, TransformControls } from '@react-three/drei'
 import AltarObject from './AltarObject.jsx'
 import PhotoFrame from './PhotoFrame.jsx'
 import CandleLights from './CandleLights.jsx'
@@ -270,15 +270,75 @@ function IdleOrbit({ orbitRef }) {
   return null
 }
 
+// Gizmo compartido para mover varios objetos a la vez: un pivote invisible
+// se ubica en el centroide de los seleccionados y, mientras se arrastra, el
+// desplazamiento del pivote (delta, no posición absoluta) se aplica por
+// igual a cada objeto — así cada uno conserva su posición relativa al resto.
+// Solo traslada (rotar/escalar en grupo queda fuera del alcance por ahora).
+function GroupTransformControls({ objects, selectedIds, snap, onTranslateMany, onDragStart, onDragEnd, orbitRef }) {
+  const pivotRef = useRef()
+  const lastPos = useRef(new THREE.Vector3())
+  const key = selectedIds.join(',')
+
+  // El centroide solo se recalcula cuando cambia el conjunto seleccionado,
+  // no en cada frame: si no, arrastrar el pivote y recentrarlo a la vez se
+  // pisarían entre sí.
+  const centroid = useMemo(() => {
+    const c = new THREE.Vector3()
+    const selectedObjs = objects.filter((o) => selectedIds.includes(o.id))
+    selectedObjs.forEach((o) => c.add(new THREE.Vector3(...o.position)))
+    c.divideScalar(selectedObjs.length || 1)
+    return c
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key])
+
+  useEffect(() => {
+    if (!pivotRef.current) return
+    pivotRef.current.position.copy(centroid)
+    lastPos.current.copy(centroid)
+  }, [centroid])
+
+  return (
+    <>
+      <group ref={pivotRef} />
+      <TransformControls
+        object={pivotRef}
+        mode="translate"
+        translationSnap={snap ? 0.1 : null}
+        onMouseDown={() => {
+          if (orbitRef.current) orbitRef.current.enabled = false
+          onDragStart()
+        }}
+        onObjectChange={() => {
+          const p = pivotRef.current
+          if (!p) return
+          const delta = p.position.clone().sub(lastPos.current)
+          if (delta.lengthSq() > 0) {
+            onTranslateMany(selectedIds, delta.toArray())
+            lastPos.current.copy(p.position)
+          }
+        }}
+        onMouseUp={() => {
+          if (orbitRef.current) orbitRef.current.enabled = true
+          onDragEnd()
+        }}
+      />
+    </>
+  )
+}
+
 export default function AltarScene({
   photo,
   objects,
-  selectedId,
+  selectedIds,
   justAddedId = null,
   mode,
   snap,
   onSelect,
   onTransform,
+  onTranslateMany,
+  onGroupDragStart,
+  onGroupDragEnd,
   focusRef,
   autoOrbit = false,
   messages = [],
@@ -316,15 +376,28 @@ export default function AltarScene({
         <AltarObject
           key={obj.id}
           object={obj}
-          selected={obj.id === selectedId}
+          selected={selectedIds.includes(obj.id)}
+          showGizmo={selectedIds.length === 1}
           justAdded={obj.id === justAddedId}
           mode={mode}
           snap={snap}
-          onSelect={() => onSelect(obj.id)}
+          onSelect={(additive) => onSelect(obj.id, additive)}
           onTransform={onTransform}
           orbitRef={orbitRef}
         />
       ))}
+
+      {selectedIds.length > 1 && (
+        <GroupTransformControls
+          objects={objects}
+          selectedIds={selectedIds}
+          snap={snap}
+          onTranslateMany={onTranslateMany}
+          onDragStart={onGroupDragStart}
+          onDragEnd={onGroupDragEnd}
+          orbitRef={orbitRef}
+        />
+      )}
 
       {autoOrbit && <IdleOrbit orbitRef={orbitRef} />}
 

@@ -151,13 +151,27 @@ function AltarEditor() {
     nextId = saved.reduce((max, o) => Math.max(max, o.id), 0) + 1
     return saved
   })
-  const [selectedId, setSelectedId] = useState(null)
-  // Espeja selectedId para leerlo desde el listener de teclado (atajo F de
+  // Selección múltiple: lista de ids. La mayoría de las acciones (menú
+  // "Seleccionado", atajos G/R/S) siguen pensadas para un solo objeto; con
+  // 2+ seleccionados el menú muestra un panel de acciones en lote y el
+  // gizmo de mover en grupo (GroupTransformControls en AltarScene.jsx).
+  const [selectedIds, setSelectedIds] = useState([])
+  // Espeja selectedIds para leerlo desde el listener de teclado (atajo F de
   // enfocar cámara) sin depender de una closure vieja.
-  const selectedIdRef = useRef(selectedId)
+  const selectedIdsRef = useRef(selectedIds)
   useEffect(() => {
-    selectedIdRef.current = selectedId
-  }, [selectedId])
+    selectedIdsRef.current = selectedIds
+  }, [selectedIds])
+
+  // additive=true (Shift/Ctrl/Cmd+clic) suma o quita `id` de la selección
+  // actual; si no, la reemplaza. id=null limpia la selección.
+  const selectObject = useCallback((id, additive = false) => {
+    setSelectedIds((prev) => {
+      if (id == null) return []
+      if (!additive) return [id]
+      return prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    })
+  }, [])
   const [mode, setMode] = useState('translate')
   const [snap, setSnap] = useState(false)
   const [menuOpen, setMenuOpen] = useState(true)
@@ -219,7 +233,7 @@ function AltarEditor() {
     historyRef.current = historyRef.current.slice(0, -1)
     futureRef.current = [...futureRef.current, objectsRef.current].slice(-HISTORY_LIMIT)
     setObjects(past)
-    setSelectedId(null)
+    setSelectedIds([])
     setCanUndo(historyRef.current.length > 0)
     setCanRedo(true)
   }, [])
@@ -230,7 +244,7 @@ function AltarEditor() {
     futureRef.current = futureRef.current.slice(0, -1)
     historyRef.current = [...historyRef.current, objectsRef.current].slice(-HISTORY_LIMIT)
     setObjects(next)
-    setSelectedId(null)
+    setSelectedIds([])
     setCanRedo(futureRef.current.length > 0)
     setCanUndo(true)
   }, [])
@@ -336,7 +350,7 @@ function AltarEditor() {
   // Captura la escena como PNG: deselecciona (para que no salga el gizmo),
   // espera a que se pinte el siguiente frame y descarga el canvas.
   const captureScreenshot = () => {
-    setSelectedId(null)
+    setSelectedIds([])
     requestAnimationFrame(() =>
       requestAnimationFrame(() => {
         const canvas = document.querySelector('canvas')
@@ -354,7 +368,7 @@ function AltarEditor() {
     if (!window.confirm('¿Quitar todos los objetos del altar? Podés deshacerlo con Ctrl+Z.')) return
     pushHistory()
     setObjects([])
-    setSelectedId(null)
+    setSelectedIds([])
   }
 
   // Tope compartido por las cuatro formas de sumar objetos (forma, modelo,
@@ -382,7 +396,7 @@ function AltarEditor() {
     }
     pushHistory()
     setObjects((prev) => [...prev, obj])
-    setSelectedId(obj.id)
+    setSelectedIds([obj.id])
     markJustAdded(obj.id)
   }
 
@@ -401,7 +415,7 @@ function AltarEditor() {
     }
     pushHistory()
     setObjects((prev) => [...prev, obj])
-    setSelectedId(obj.id)
+    setSelectedIds([obj.id])
     markJustAdded(obj.id)
   }
 
@@ -421,7 +435,7 @@ function AltarEditor() {
     }
     pushHistory()
     setObjects((prev) => [...prev, obj])
-    setSelectedId(obj.id)
+    setSelectedIds([obj.id])
     markJustAdded(obj.id)
   }
 
@@ -430,10 +444,42 @@ function AltarEditor() {
     setObjects((prev) => prev.map((o) => (o.id === id ? { ...o, ...patch } : o)))
   }, [])
 
+  // Aplica el mismo delta de posición a varios objetos a la vez: lo usa
+  // GroupTransformControls (AltarScene.jsx) mientras se arrastra el gizmo
+  // compartido de mover en grupo. No llama a pushHistory (dispara en cada
+  // frame de arrastre); eso lo hace onGroupDragStart una sola vez.
+  const translateMany = useCallback((ids, delta) => {
+    setObjects((prev) =>
+      prev.map((o) =>
+        ids.includes(o.id)
+          ? { ...o, position: [o.position[0] + delta[0], o.position[1] + delta[1], o.position[2] + delta[2]] }
+          : o,
+      ),
+    )
+  }, [])
+  const groupDragStarted = useRef(false)
+  const onGroupDragStart = useCallback(() => {
+    if (groupDragStarted.current) return
+    groupDragStarted.current = true
+    pushHistory()
+  }, [])
+  const onGroupDragEnd = useCallback(() => {
+    groupDragStarted.current = false
+  }, [])
+
   const removeObject = (id) => {
     pushHistory()
     setObjects((prev) => prev.filter((o) => o.id !== id || o.locked))
-    setSelectedId((sel) => (sel === id ? null : sel))
+    setSelectedIds((sel) => sel.filter((s) => s !== id))
+  }
+
+  // Elimina todos los objetos seleccionados (los bloqueados, si por algún
+  // motivo estuvieran en la selección, se conservan).
+  const removeSelected = () => {
+    if (selectedIds.length === 0) return
+    pushHistory()
+    setObjects((prev) => prev.filter((o) => !selectedIds.includes(o.id) || o.locked))
+    setSelectedIds([])
   }
 
   const toggleLock = (id) => {
@@ -453,8 +499,31 @@ function AltarEditor() {
     }
     pushHistory()
     setObjects((prev) => [...prev, copy])
-    setSelectedId(copy.id)
+    setSelectedIds([copy.id])
     markJustAdded(copy.id)
+  }
+
+  // Duplica todos los objetos seleccionados de una vez, conservando el
+  // mismo desplazamiento visible que la duplicación individual, y deja
+  // seleccionadas las copias (no los originales).
+  const duplicateSelected = () => {
+    if (selectedIds.length === 0) return
+    const sources = objects.filter((o) => selectedIds.includes(o.id))
+    if (sources.length === 0) return
+    if (objects.length + sources.length > MAX_OBJECTS) {
+      window.alert(`El altar llegó al máximo de ${MAX_OBJECTS} objetos. Elimina alguno para agregar otro.`)
+      return
+    }
+    const copies = sources.map((src) => ({
+      ...src,
+      id: nextId++,
+      name: `${src.name} (copia)`,
+      position: [src.position[0] + 0.3, src.position[1], src.position[2] + 0.3],
+    }))
+    pushHistory()
+    setObjects((prev) => [...prev, ...copies])
+    setSelectedIds(copies.map((c) => c.id))
+    markJustAdded(copies[copies.length - 1].id)
   }
 
   const renameObject = (id, name) => {
@@ -462,10 +531,14 @@ function AltarEditor() {
     setObjects((prev) => prev.map((o) => (o.id === id ? { ...o, name } : o)))
   }
 
-  const selectFromList = (id) => {
-    setSelectedId(id)
-    const obj = objects.find((o) => o.id === id)
-    if (obj && focusRef.current) focusRef.current(obj.position)
+  // additive=true (Shift/Ctrl/Cmd+clic en la lista) extiende la selección
+  // en vez de reemplazarla, igual que el clic en la escena 3D.
+  const selectFromList = (id, additive = false) => {
+    selectObject(id, additive)
+    if (!additive) {
+      const obj = objects.find((o) => o.id === id)
+      if (obj && focusRef.current) focusRef.current(obj.position)
+    }
   }
 
   // Atajos estilo Blender: G mover, R rotar, S escalar, F enfoca la cámara
@@ -486,9 +559,9 @@ function AltarEditor() {
       } else if (k === 'g') setMode('translate')
       else if (k === 'r') setMode('rotate')
       else if (k === 's') setMode('scale')
-      else if (k === 'escape') setSelectedId(null)
+      else if (k === 'escape') setSelectedIds([])
       else if (k === 'f') {
-        const obj = objectsRef.current.find((o) => o.id === selectedIdRef.current)
+        const obj = objectsRef.current.find((o) => o.id === selectedIdsRef.current[0])
         if (obj && focusRef.current) focusRef.current(obj.position)
       }
     }
@@ -496,7 +569,16 @@ function AltarEditor() {
     return () => window.removeEventListener('keydown', onKey)
   }, [undo, redo])
 
-  const selected = objects.find((o) => o.id === selectedId) ?? null
+  // Con selección múltiple el gizmo de grupo solo mueve (no rota/escala),
+  // así que al pasar de 1 a 2+ seleccionados forzamos el modo a "translate"
+  // para que la toolbar no quede mostrando Rotar/Escalar como activos sin
+  // que hagan nada.
+  useEffect(() => {
+    if (selectedIds.length > 1) setMode('translate')
+  }, [selectedIds.length])
+
+  const selected = selectedIds.length === 1 ? objects.find((o) => o.id === selectedIds[0]) ?? null : null
+  const selectedObjects = objects.filter((o) => selectedIds.includes(o.id))
 
   return (
     <div className="app">
@@ -505,19 +587,22 @@ function AltarEditor() {
         gl={{ preserveDrawingBuffer: true }} // necesario para capturar el canvas
         camera={{ position: [0, 3.2, 5.5], fov: 50 }}
         onPointerMissed={(e) => {
-          if (e.type === 'click') setSelectedId(null)
+          if (e.type === 'click') setSelectedIds([])
         }}
       >
         <AltarScene
           photo={photo}
           clothColor={clothColor}
           objects={objects}
-          selectedId={selectedId}
+          selectedIds={selectedIds}
           justAddedId={justAddedId}
           mode={mode}
           snap={snap}
-          onSelect={setSelectedId}
+          onSelect={selectObject}
           onTransform={updateObject}
+          onTranslateMany={translateMany}
+          onGroupDragStart={onGroupDragStart}
+          onGroupDragEnd={onGroupDragEnd}
           focusRef={focusRef}
         />
       </Canvas>
@@ -544,6 +629,8 @@ function AltarEditor() {
         categories={MODEL_CATEGORIES}
         objects={objects}
         selected={selected}
+        selectedIds={selectedIds}
+        selectedObjects={selectedObjects}
         snap={snap}
         onAddShape={addShape}
         onAddModel={addModel}
@@ -554,6 +641,8 @@ function AltarEditor() {
         onColorChange={(color) => selected && updateObject(selected.id, { color })}
         onDuplicate={() => selected && duplicateObject(selected.id)}
         onDelete={() => selected && removeObject(selected.id)}
+        onDuplicateSelected={duplicateSelected}
+        onDeleteSelected={removeSelected}
         onRename={renameObject}
         onToggleSnap={() => setSnap((s) => !s)}
         onClearAltar={clearAltar}
@@ -581,7 +670,8 @@ function AltarEditor() {
       <TransformToolbar
         mode={mode}
         onModeChange={setMode}
-        hasSelection={!!selected}
+        hasSelection={selectedIds.length > 0}
+        multiSelect={selectedIds.length > 1}
         canUndo={canUndo}
         canRedo={canRedo}
         onUndo={undo}
