@@ -7,6 +7,7 @@ import MusicPlayer from './components/MusicPlayer.jsx'
 import AltarViewer from './components/AltarViewer.jsx'
 import ThumbnailStage from './components/ThumbnailStage.jsx'
 import AboutPanel from './components/AboutPanel.jsx'
+import HelpPanel from './components/HelpPanel.jsx'
 import Onboarding from './components/Onboarding.jsx'
 import ShareModal from './components/ShareModal.jsx'
 import SharePreviewModal from './components/SharePreviewModal.jsx'
@@ -177,6 +178,7 @@ function AltarEditor() {
   const [snap, setSnap] = useState(false)
   const [menuOpen, setMenuOpen] = useState(true)
   const [aboutOpen, setAboutOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
   // Bienvenida de primera visita: solo se muestra si nunca se cerró en
   // este navegador (no depende de si ya hay objetos, por si vino de un
   // altar restaurado o compartido con otro dispositivo).
@@ -680,11 +682,21 @@ function AltarEditor() {
         maxObjects={MAX_OBJECTS}
         objectsWarningAt={OBJECTS_WARNING_THRESHOLD}
         onShowAbout={() => setAboutOpen(true)}
+        onShowHelp={() => setHelpOpen(true)}
       />
       )}
 
       {aboutOpen && <AboutPanel onClose={() => setAboutOpen(false)} />}
-      {showOnboarding && <Onboarding onClose={dismissOnboarding} />}
+      {helpOpen && <HelpPanel onClose={() => setHelpOpen(false)} />}
+      {showOnboarding && (
+        <Onboarding
+          onClose={dismissOnboarding}
+          onShowHelp={() => {
+            dismissOnboarding()
+            setHelpOpen(true)
+          }}
+        />
+      )}
       {shareInfo && (
         <ShareModal url={shareInfo.url} note={shareInfo.note} onClose={() => setShareInfo(null)} />
       )}
@@ -712,6 +724,18 @@ function AltarEditor() {
         onRedo={redo}
       />
       <MusicPlayer />
+      <button
+        className="capture-btn help-btn"
+        onClick={() => setHelpOpen(true)}
+        title="Ayuda"
+        aria-label="Ayuda"
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M9.2 9a2.9 2.9 0 0 1 5.6 1c0 1.8-2.8 2.2-2.8 3.6" />
+          <circle cx="12" cy="17.2" r="0.4" fill="currentColor" />
+        </svg>
+      </button>
       <button
         className="capture-btn"
         onClick={captureScreenshot}

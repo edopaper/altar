@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "thumbnails": "node scripts/generate-thumbnails.mjs",
+    "help-shots": "node scripts/generate-help-shots.mjs",
     "scale-config": "node scripts/generate-model-scale-config.mjs"
   },
   "dependencies": {

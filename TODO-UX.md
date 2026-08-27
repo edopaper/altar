@@ -97,6 +97,25 @@ como prioridad.
 - [x] El link se sigue copiando al portapapeles en segundo plano al abrir
       el modal (best-effort, no bloquea si el navegador lo rechaza).
 
+### 14. Menú de ayuda con capturas reales
+- [x] `HelpPanel.jsx`: guía en 4 secciones (vista general, decorar, editar,
+      compartir) + tabla de atajos de teclado. Complementa al Onboarding:
+      aquel es el resumen de primera visita, este es la referencia a la que
+      se vuelve.
+- [x] `scripts/generate-help-shots.mjs` (`npm run help-shots`): siembra un
+      altar de ejemplo vía `localStorage` y captura las 4 vistas con el
+      Chromium de Playwright, igual patrón que `generate-thumbnails.mjs`.
+      Espera contra la Performance API a que cada `.glb` de la escena esté
+      descargado Y a que no entre nada más por la red durante 2s (las
+      texturas externas se piden recién al parsear el .glb). Con un timeout
+      fijo, o esperando solo los `.glb`, las capturas salían con los cubos
+      grises del fallback de Suspense en vez de los modelos.
+- [x] Accesos: botón flotante "?" en el viewport, enlace "¿Cómo funciona?"
+      en el pie del menú y "Ver la guía completa con imágenes" en el
+      Onboarding.
+- [x] Las capturas van con `width`/`height` intrínsecos para que el
+      navegador reserve el alto y el texto no salte al cargar (lazy).
+
 ### 13. Catálogo de decoración visible (descubribilidad)
 Problema: la decoración (30 objetos, lo más rico del catálogo) vivía en
 acordeones colapsados y debajo de "Forma básica", así que las miniaturas

@@ -36,7 +36,7 @@ const STEPS = [
         <path d="M12 8v8M8 12h8" />
       </Icon>
     ),
-    text: 'Elegí un objeto en "Agregar objeto" (abajo, en el menú) para sumarlo al altar.',
+    text: 'Tocá una miniatura de "Decoración" (en el menú) para sumarla al altar.',
   },
   {
     icon: (
@@ -69,7 +69,7 @@ const STEPS = [
   },
 ]
 
-export default function Onboarding({ onClose }) {
+export default function Onboarding({ onClose, onShowHelp }) {
   return (
     <div className="message-overlay" onClick={onClose}>
       <div className="message-form onboarding-form" onClick={(e) => e.stopPropagation()}>
@@ -83,10 +83,13 @@ export default function Onboarding({ onClose }) {
           ))}
         </ul>
         <div className="shape-row message-actions">
-          <button className="btn btn--block" onClick={onClose}>
+          <button className="btn btn--block btn--primary" onClick={onClose}>
             Entendido, ¡vamos!
           </button>
         </div>
+        <button className="menu-about-link onboarding-help-link" onClick={onShowHelp}>
+          Ver la guía completa con imágenes
+        </button>
       </div>
     </div>
   )

@@ -97,6 +97,7 @@ export default function AltarMenu({
   maxObjects,
   objectsWarningAt,
   onShowAbout,
+  onShowHelp,
 }) {
   const [decorQuery, setDecorQuery] = useState('')
   // Chip de categoría activo: 'all' muestra todo el catálogo agrupado.
@@ -105,7 +106,8 @@ export default function AltarMenu({
   const isSearching = decorSearch.length > 0
 
   // Catálogo unificado (papel picado + modelos) en grupos con la misma
-  // forma, para renderizar chips y cuadrículas de manera homogénea.
+  // forma, para renderizar chips y cuadrículas de manera homogénea. Un
+  // grupo sin elementos (ej. sin archivos de papel picado) no aparece.
   const decorGroups = [
     {
       id: 'papel',
@@ -117,7 +119,7 @@ export default function AltarMenu({
       label: cat.category,
       items: cat.models.map((m) => ({ key: m.path, thumb: m.thumbnail, name: m.name, add: () => onAddModel(m) })),
     })),
-  ]
+  ].filter((g) => g.items.length > 0)
   const totalDecor = decorGroups.reduce((n, g) => n + g.items.length, 0)
 
   // Al buscar se recorre todo el catálogo (el chip activo se ignora para no
@@ -374,9 +376,14 @@ export default function AltarMenu({
       <div className="menu-hint">
         Click: seleccionar · Click fuera: deseleccionar · G/R/S: modo · F: enfocar · Esc: soltar · Ctrl+Z: deshacer
       </div>
-      <button className="menu-about-link" onClick={onShowAbout}>
-        Acerca de
-      </button>
+      <div className="menu-footer-links">
+        <button className="menu-about-link" onClick={onShowHelp}>
+          ¿Cómo funciona?
+        </button>
+        <button className="menu-about-link" onClick={onShowAbout}>
+          Acerca de
+        </button>
+      </div>
       </div>
     </aside>
   )
