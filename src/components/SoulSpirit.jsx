@@ -110,9 +110,9 @@ export default function SoulSpirit({ soul, onDone }) {
           anchorX="center"
           anchorY="bottom"
           maxWidth={2.6}
-          outlineWidth={0.006}
+          outlineWidth={0.013}
           outlineColor="#1a1428"
-          outlineOpacity={0.6}
+          outlineOpacity={1}
         >
           {signature}
         </Text>
