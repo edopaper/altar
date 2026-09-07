@@ -74,7 +74,7 @@ function getConfiguredScale(modelPath, scaleConfig) {
  * y el gizmo de escala parte de una base neutra.
  */
 export default function ModelLoader({ path }) {
-  const { scene } = useGLTF(path)
+  const { scene } = useGLTF(path, '/draco/')
   const gl = useThree((state) => state.gl)
 
   // null mientras carga: el primer render de cada sesión usa escala 1 hasta

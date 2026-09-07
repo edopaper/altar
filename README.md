@@ -7,7 +7,7 @@ Editor y visor de altares en React, Three.js y Supabase.
 Configura `.env` a partir de `.env.example`, instala con `npm ci` y ejecuta `npm run dev`.
 
 - `npm run build`: genera el catálogo y compila el frontend.
-- `npm test`: valida escenas, moderación, almacenamiento y la API de compartir con Supabase simulado.
+- `npm test`: valida escenas, plantillas, recuperación, moderación y la API con Supabase simulado. También ejecuta PostgreSQL en memoria (PGlite) para comprobar la migración 017, aislamiento por cuenta, privacidad, cupo y control de versiones.
 - `node scripts/test-browser.mjs`: prueba el servidor local en el puerto 5173. Acepta una URL como primer argumento para verificar `npm run preview`, por ejemplo `node scripts/test-browser.mjs http://127.0.0.1:5174`.
 - Las pruebas de navegador requieren Chromium de Playwright instalado o `CHROMIUM_PATH`. Simulan las llamadas externas; no publican altares reales.
 - `deno check supabase/functions/share-altar/index.ts supabase/functions/add-message/index.ts`: comprueba los tipos del servidor.
@@ -61,17 +61,40 @@ Pulsa «Entrar con Google», elige una cuenta y verifica que vuelvas al mismo al
 - `redirect_uri_mismatch`: revisa el callback de **Supabase** registrado en **Google**.
 - Retorno a un dominio/puerto incorrecto: revisa las URLs de la **app** registradas en **Supabase**.
 
-Iniciar sesión permite guardar y administrar hasta tres altares desde «Mis altares». Los cambios del editor se conservan como borradores locales separados por cuenta y altar. Pulsa «Guardar altar» para sincronizarlos con Supabase; al guardar se conserva el enlace público.
+Iniciar sesión permite guardar y administrar hasta tres altares desde «Mis altares». Los cambios del editor se conservan como borradores locales separados por cuenta y altar. Pulsa «Guardar borrador» para sincronizarlos con Supabase de forma privada. Después del primer guardado, se sincronizan tras diez segundos sin cambios. «Publicar altar» o «Publicar cambios» actualiza la versión pública conservando el enlace.
 
 Referencias: [Google en Supabase](https://supabase.com/docs/guides/auth/social-login/auth-google) y [URLs de retorno](https://supabase.com/docs/guides/auth/redirect-urls).
 
 
 ## Mis altares y máximo de 3 por cuenta
 
-- Ruta `#/mis-altares`: lista propia, creación, edición y eliminación con confirmación. Los altares ocultos también cuentan para el límite.
+- Ruta `#/mis-altares`: lista propia, creación, edición y eliminación con confirmación. Los borradores privados y los altares ocultos también cuentan para el límite.
 - Migración `supabase/016_user_altars.sql`: propietario privado, tres espacios por cuenta, índice único y asignación transaccional. Las RPC `my_altars` y `delete_my_altar` usan `auth.uid()` y no aceptan un ID de propietario enviado por el cliente.
 - `share-altar` verifica el JWT con `getUser`. Los altares nuevos requieren sesión. Un altar que ya tiene propietario solo puede editarlo esa cuenta; un token antiguo no evita esta comprobación.
 - Los altares anónimos anteriores mantienen su enlace. Para asociar el último altar anterior a tu cuenta, inicia sesión en el navegador que lo publicó y vuelve a guardarlo: debe conservar su token de edición y la cuenta debe tener cupo. No se adjudican automáticamente altares por nombre o correo.
 - Eliminar libera un espacio y borra los mensajes por cascada. La fotografía subida al bucket no se purga mediante esta RPC.
 - Despliegue: aplicar primero 016 en SQL Editor o `supabase db query --linked --file supabase/016_user_altars.sql`, después `supabase functions deploy share-altar`, y publicar el frontend. La migración se aplica una sola vez.
 - Prueba SQL: ejecutar `tests/user-altars.sql` entre `BEGIN` y `ROLLBACK` después de 016; verifica cupo, aislamiento, actualización y reutilización de espacios con datos temporales.
+
+
+## Borradores privados, sincronización y plantillas (017)
+
+- `altars` conserva la última versión publicada; `altar_drafts` guarda el contenido privado y su revisión. Guardar no modifica el nombre, la escena ni la foto que ven los visitantes. Los altares existentes siguen publicados, con los mismos enlaces y mensajes.
+- Las fotografías de borradores se guardan dentro del contenido privado. Solo «Publicar» las sube al bucket público, en una ruta nueva, sin sobrescribir fotografías de la versión anterior. No se retira contenido ya publicado mediante «Guardar borrador».
+- El primer guardado requiere cuenta y una acción explícita. Después se sincroniza automáticamente tras diez segundos sin editar; el estado muestra cambios pendientes y última sincronización. Al recuperar conexión o volver a la ventana se comprueba la versión del servidor. Las escenas sin sincronizar permanecen en el navegador; no se garantiza que modelos 3D nunca descargados puedan abrirse sin conexión.
+- La revisión se comprueba dentro de una transacción con bloqueo de la fila. Si dos dispositivos editan la misma versión, el segundo debe elegir entre su copia y la de la cuenta. La alternativa se conserva localmente en «Recuperar copia anterior»; es una copia de recuperación, no un historial ilimitado. La publicación respeta los controles existentes de moderación.
+- El almacenamiento local `workspace-v2` agrupa nombre, escena, foto, mantel y revisión. Lee borradores anteriores al migrar. Los borradores están separados por cuenta; al iniciar sesión desde el editor se transporta la composición de invitado en esa pestaña.
+- El primer guardado usa un identificador estable para que los reintentos tras una respuesta perdida recuperen el mismo borrador.
+- El generador de catálogo copia el decodificador Draco de Three.js a `public/draco/` (ignorado en Git). Los modelos comprimidos se cargan desde el mismo servidor sin depender de un CDN externo.
+- «Plantillas» ofrece Sencillo (5 objetos), Tradicional (10) y Familiar (14). Sustituye objetos y mantel, conserva la fotografía y respalda la composición anterior antes de reemplazarla. Los objetos permanecen editables.
+- El cliente comprueba `draftProtocol: 2` con una petición sin escena antes de enviar cambios. Si las funciones desplegadas son anteriores, se bloquea el guardado remoto para evitar que interpreten un borrador como una publicación.
+- `share-altar` acepta `action: save | publish` y `revision`. Los clientes anteriores que intenten actualizar sin la revisión vigente reciben un conflicto en lugar de sobrescribir cambios. Guardados y publicaciones utilizan contadores separados; el guardado de borradores existentes permite 600 solicitudes/hora por IP y publicar conserva 30/hora.
+
+### Despliegue de esta versión
+
+1. Aplicar `supabase/017_private_drafts.sql` una sola vez, después de 016. Realizar el cambio junto con el despliegue de funciones y frontend para evitar mantener clientes anteriores escribiendo durante la transición.
+2. Desplegar `share-altar`, `add-message` y `report-altar`. Estas dos últimas ya excluyen los borradores privados.
+3. Publicar el frontend compilado y recargar los clientes abiertos.
+4. Verificar con dos cuentas: un borrador no abre como enlace público; publicar sí; guardar ediciones no altera ese enlace; una edición concurrente requiere resolver el conflicto.
+
+Pruebas locales: `npm test`, `npm run build`, `deno check supabase/functions/share-altar/index.ts supabase/functions/add-message/index.ts supabase/functions/report-altar/index.ts`, y `node scripts/test-browser.mjs` con Vite abierto. El navegador simula las APIs y el login; las pruebas SQL usan una base efímera y no modifican el proyecto alojado.

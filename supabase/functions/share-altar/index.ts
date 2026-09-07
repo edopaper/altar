@@ -18,7 +18,7 @@ const UPDATE_RATE_LIMIT = 30; // actualizaciones (mismo altar) por IP, más laxo
 const WINDOW_MS = 60 * 60 * 1000; // 1 hora
 import { isValidScene, cleanObject, isColor } from '../_shared/scene-validation.js';
 const PHOTO_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
-const SLUG_ATTEMPTS = 5;
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -32,9 +32,6 @@ function json(body: unknown, status = 200) {
   });
 }
 
-function randomSlug() {
-  return Math.random().toString(36).slice(2, 7);
-}
 
 function getClientIp(req: Request): string {
   const fwd = req.headers.get("x-forwarded-for");
@@ -88,6 +85,8 @@ Deno.serve(async (req) => {
     return json({ error: status === 413 ? "El contenido supera el tamaño permitido." : "JSON inválido" }, status);
   }
 
+  if (payload?.action === 'capabilities') return json({ draftProtocol: 2 });
+
   const { name, objects, clothColor, photo, slug: requestedSlug, editToken } = payload ?? {};
 
   if (!isValidScene(objects)) {
@@ -117,157 +116,79 @@ Deno.serve(async (req) => {
   if (authError || !authData.user) return json({ error: 'Tu sesión expiró. Vuelve a iniciar sesión.' }, 401);
   const userId = authData.user.id;
 
-  // Sube la foto (si hay) al path `${slug}.${ext}`; `upsert` en true permite
-  // reemplazar la foto de un altar que ya existe.
-  async function uploadPhoto(slug: string, upsert: boolean, existingPhoto: string | null = null): Promise<string | null> {
-    if (typeof photo !== "string" || !photo) return null;
-    if (existingPhoto && photo === existingPhoto) return existingPhoto;
-    const decoded = decodeDataUrl(photo);
-    if (!decoded) throw json({ error: "Foto inválida." }, 400);
-    if (decoded.bytes.byteLength > PHOTO_MAX_BYTES) {
-      throw json({ error: "La foto supera el máximo permitido (5 MB)." }, 400);
-    }
-    const realType = sniffImageType(decoded.bytes);
-    if (!realType) {
-      throw json({ error: "La foto debe ser una imagen PNG o JPG válida." }, 400);
-    }
-    const ext = realType === "image/png" ? "png" : "jpg";
-    const path = `${slug}.${ext}`;
-    const { error: uploadError } = await supabase.storage
-      .from("altar-photos")
-      .upload(path, decoded.bytes, { contentType: realType, upsert });
-    if (uploadError) throw json({ error: "No se pudo subir la foto." }, 500);
-
-    const { data: publicUrlData } = supabase.storage.from("altar-photos").getPublicUrl(path);
-    return publicUrlData.publicUrl;
+  const action = payload.action ?? 'publish';
+  const revision = payload.revision ?? 0;
+  if (!['save', 'publish'].includes(action as string) || !Number.isSafeInteger(revision) || (revision as number) < 0) {
+    return json({ error: 'Acción o versión inválida.' }, 400);
   }
-
-  // --- Actualizar un altar ya compartido, si el cliente mandó slug+editToken
-  // y coinciden con lo que guardamos al crearlo. No consume el rate limit de
-  // altares nuevos, y no toca `status`/`reported_count` (el historial de
-  // moderación se conserva aunque se edite el contenido).
-  if (typeof requestedSlug === "string" && requestedSlug) {
-    const { data: existing, error: fetchError } = await supabase
-      .from("altars")
-      .select("edit_token, owner_id, photo_url")
-      .eq("slug", requestedSlug)
-      .maybeSingle();
-
-    if (fetchError) {
-      return json({ error: "No se pudo actualizar el altar." }, 500);
-    }
-    if (!existing || (existing.owner_id ? existing.owner_id !== userId : (!editToken || existing.edit_token !== editToken))) {
-      return json(
-        { error: "No tenés permiso para editar ese altar.", invalidEditToken: true },
-        403,
-      );
-    }
-
-    // Límite propio para actualizaciones (más laxo que el de creación): sin
-    // esto, un loop descontrolado podría pegarle sin freno a esta rama.
-    const updateIp = getClientIp(req);
-    const { data: updateAllowed, error: updateSlotError } = await supabase.rpc(
-      "take_share_update_rate_limit_slot",
-      { p_ip: updateIp, p_window_seconds: WINDOW_MS / 1000, p_limit: UPDATE_RATE_LIMIT },
-    );
-    if (updateSlotError) {
-      return json({ error: "No se pudo verificar el límite de uso." }, 500);
-    }
-    if (!updateAllowed) {
-      return json(
-        { error: `Límite de ${UPDATE_RATE_LIMIT} actualizaciones por hora alcanzado. Probá de nuevo más tarde.` },
-        429,
-      );
-    }
-
-    let photoUrl: string | null;
-    try {
-      photoUrl = await uploadPhoto(requestedSlug, true, existing.photo_url);
-    } catch (res) {
-      return res as Response;
-    }
-
-    const { error: updateError } = await supabase
-      .from("altars")
-      .update({
-        name: (name as string) || "Altar de muertos",
-        objects: cleanObjects,
-        owner_id: userId,
-        photo_url: photoUrl,
-        cloth_color: (clothColor as string) ?? null,
-      })
-      .eq("slug", requestedSlug);
-
-    if (updateError) {
-      return json({ error: updateError.code === "P0001" ? "Ya tienes 3 altares. Elimina uno desde Mis altares para guardar otro." : "No se pudo actualizar el altar." }, updateError.code === "P0001" ? 409 : 500);
-    }
-
-    return json({ slug: requestedSlug, editToken, updated: true });
+  if (requestedSlug !== undefined && (typeof requestedSlug !== 'string' || !/^[a-z0-9]{1,64}$/.test(requestedSlug))) {
+    return json({ error: 'Identificador inválido.' }, 400);
   }
-
-  // --- Crear un altar nuevo.
+  const draftId = payload.draftId;
+  if (draftId !== undefined && (typeof draftId !== 'string' || !/^[a-f0-9]{32}$/.test(draftId))) return json({ error: 'Identificador de borrador inválido.' }, 400);
+  const candidate = requestedSlug || draftId;
+  let existing: { owner_id: string | null; edit_token: string | null; photo_url: string | null } | null = null;
+  if (candidate) {
+    const result = await supabase.from('altars').select('owner_id, edit_token, photo_url').eq('slug', candidate).maybeSingle();
+    if (result.error) return json({ error: 'No se pudo cargar el altar.' }, 500);
+    existing = result.data;
+    if (!existing && requestedSlug) return json({ error: 'Este altar ya no existe.', conflict: true }, 409);
+    if (existing && (existing.owner_id ? existing.owner_id !== userId : !editToken || existing.edit_token !== editToken)) {
+      return json({ error: 'No tienes permiso para editar este altar.' }, 403);
+    }
+  }
+  // Detect stale versions before validating a photo URL that may belong to an
+  // older public snapshot. The commit repeats this check under the row lock.
+  if (existing) {
+    const { data: draft, error } = await supabase.from('altar_drafts').select('revision').eq('slug', candidate).maybeSingle();
+    if (error) return json({ error: 'No se pudo comprobar la versión del borrador.' }, 500);
+    if ((draft?.revision ?? 0) !== revision) return json({ error: 'Hay cambios más recientes. Revisa las versiones antes de guardar.', conflict: true }, 409);
+  }
+  // Private images stay inside the protected draft. Never upload them to the
+  // public bucket until publication, and never overwrite a published image.
+  let decoded: ReturnType<typeof decodeDataUrl> = null;
+  let realType: ReturnType<typeof sniffImageType> = null;
+  if (photo && photo !== existing?.photo_url) {
+    decoded = decodeDataUrl(photo as string);
+    if (!decoded || decoded.bytes.byteLength > PHOTO_MAX_BYTES) return json({ error: 'Foto inválida.' }, 400);
+    realType = sniffImageType(decoded.bytes);
+    if (!realType) return json({ error: 'La foto debe ser una imagen PNG o JPG válida.' }, 400);
+  }
   const ip = getClientIp(req);
-
-  // Cuenta + reserva el slot en una sola sentencia atómica (evita que
-  // pedidos muy seguidos se pisen y dejen pasar más de RATE_LIMIT por IP).
-  const { data: slot, error: slotError } = await supabase
-    .rpc("take_share_rate_limit_slot", {
-      p_ip: ip,
-      p_window_seconds: WINDOW_MS / 1000,
-      p_limit: RATE_LIMIT,
-    })
-    .single<{ allowed: boolean; retry_after_seconds: number; remaining: number }>();
-
-  if (slotError || !slot) {
-    return json({ error: "No se pudo verificar el límite de uso." }, 500);
-  }
-
-  if (!slot.allowed) {
-    const retryAfterMinutes = Math.max(1, Math.ceil(slot.retry_after_seconds / 60));
-    return json(
-      {
-        error: `Límite de ${RATE_LIMIT} altares compartidos por hora alcanzado. Probá de nuevo en ${retryAfterMinutes} min.`,
-        limit: RATE_LIMIT,
-        remaining: 0,
-        retryAfterMinutes,
-      },
-      429,
-    );
-  }
-
-  const newEditToken = crypto.randomUUID();
-
-  for (let attempt = 0; attempt < SLUG_ATTEMPTS; attempt++) {
-    const slug = randomSlug();
-
-    let photoUrl: string | null;
-    try {
-      photoUrl = await uploadPhoto(slug, false);
-    } catch (res) {
-      return res as Response;
-    }
-
-    const { error: insertError } = await supabase.from("altars").insert({
-      slug,
-      name: (name as string) || "Altar de muertos",
-      objects: cleanObjects,
-      photo_url: photoUrl,
-      cloth_color: (clothColor as string) ?? null,
-      edit_token: newEditToken,
-      owner_id: userId,
+  if (existing) {
+    const limit = action === 'save' ? 600 : UPDATE_RATE_LIMIT;
+    const { data, error } = await supabase.rpc('take_share_update_rate_limit_slot', {
+      p_ip: `${ip}:${action}`, p_window_seconds: WINDOW_MS / 1000, p_limit: limit,
     });
-
-    if (!insertError) {
-      return json({ slug, editToken: newEditToken, remaining: slot.remaining, limit: RATE_LIMIT });
-    }
-
-    if (insertError.code === "P0001" || (insertError.code === "23505" && insertError.message?.includes("altars_owner_slot_unique"))) {
-      return json({ error: "Ya tienes 3 altares. Elimina uno desde Mis altares para guardar otro." }, 409);
-    }
-    if (insertError.code !== "23505") {
-      return json({ error: "No se pudo guardar el altar." }, 500);
-    }
+    if (error) return json({ error: 'No se pudo verificar el límite de uso.' }, 500);
+    if (!data) return json({ error: 'Límite de guardados alcanzado. Intenta más tarde.' }, 429);
+  } else {
+    const { data, error } = await supabase.rpc('take_share_rate_limit_slot', {
+      p_ip: ip, p_window_seconds: WINDOW_MS / 1000, p_limit: RATE_LIMIT,
+    }).single<{ allowed: boolean; remaining: number }>();
+    if (error || !data) return json({ error: 'No se pudo verificar el límite de uso.' }, 500);
+    if (!data.allowed) return json({ error: 'Límite de creación alcanzado. Intenta más tarde.' }, 429);
   }
-
-  return json({ error: "No se pudo generar un slug único, probá de nuevo." }, 500);
+  const slug = (candidate as string) || crypto.randomUUID().replaceAll('-', '');
+  let photoUrl = (photo as string) || null;
+  let uploadedPath: string | null = null;
+  if (action === 'publish' && decoded && realType) {
+    uploadedPath = `${slug}/${crypto.randomUUID()}.${realType === 'image/png' ? 'png' : 'jpg'}`;
+    const { error } = await supabase.storage.from('altar-photos').upload(uploadedPath, decoded.bytes, { contentType: realType });
+    if (error) return json({ error: 'No se pudo subir la foto.' }, 500);
+    photoUrl = supabase.storage.from('altar-photos').getPublicUrl(uploadedPath).data.publicUrl;
+  }
+  const newEditToken = (editToken as string) || crypto.randomUUID();
+  const { data, error } = await supabase.rpc('commit_altar_draft', {
+    p_slug: slug, p_user: userId, p_revision: revision,
+    p_content: { name: (name as string)?.trim() || 'Mi altar', objects: cleanObjects, photo: photo || null, clothColor: clothColor ?? null },
+    p_publish: action === 'publish', p_photo_url: photoUrl, p_edit_token: newEditToken,
+  });
+  if (error) {
+    if (uploadedPath) await supabase.storage.from('altar-photos').remove([uploadedPath]);
+    if (error.code === '40001' || error.code === '23505') return json({ error: 'Hay cambios más recientes. Revisa las versiones antes de guardar.', conflict: true }, 409);
+    if (error.code === 'P0001') return json({ error: 'Ya tienes 3 altares. Elimina uno desde Mis altares para guardar otro.' }, 409);
+    return json({ error: 'No se pudo guardar el altar.' }, 500);
+  }
+  return json({ ...data, editToken: newEditToken, updated: Boolean(existing) });
 });

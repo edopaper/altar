@@ -15,7 +15,7 @@ export default function SharePreviewModal({ image, onConfirm, onClose }) {
             Cancelar
           </button>
           <button className="btn btn--block btn--primary" onClick={onConfirm}>
-            Compartir
+            Publicar
           </button>
         </div>
     </Modal>

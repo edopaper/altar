@@ -9,6 +9,7 @@
   "workspace": {
     "packageJson": {
       "dependencies": [
+        "npm:@electric-sql/pglite@~0.5.8",
         "npm:@react-three/drei@^9.114.3",
         "npm:@react-three/fiber@^8.17.10",
         "npm:@supabase/supabase-js@^2.112.3",

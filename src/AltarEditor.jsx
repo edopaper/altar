@@ -1,6 +1,9 @@
 import { QualityControls } from './QualityContext.jsx'
 import { readLocal, writeLocal } from './localStore.js'
-import useDraftPersistence from './useDraftPersistence.js'
+import useCloudDraft from './useCloudDraft.js'
+import { restoreDraft } from './draftState.js'
+import { TEMPLATES, createTemplate } from './templates.js'
+import Modal from './components/Modal.jsx'
 import { restoreScene, isColor } from '../supabase/functions/_shared/scene-validation.js'
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
@@ -15,7 +18,7 @@ const Onboarding = lazy(() => import('./components/Onboarding.jsx'))
 const ShareModal = lazy(() => import('./components/ShareModal.jsx'))
 const SharePreviewModal = lazy(() => import('./components/SharePreviewModal.jsx'))
 import Toast from './components/Toast.jsx'
-import { saveSharedAltar } from './storage.js'
+
 import { MODEL_CATEGORIES } from './models.js'
 import { PAPER_LIST } from './papel.js'
 
@@ -78,8 +81,46 @@ function loadSavedObjects(prefix = '', fallback = []) {
 let nextId = 1
 
 export default function AltarEditor({ initialAltar = null, draftPrefix = '' }) {
+  const [workspace] = useState(() => {
+    let stored = null
+    try { stored = JSON.parse(readLocal(draftPrefix + 'workspace-v2')) } catch {}
+    if (!stored && draftPrefix.startsWith('account:') && draftPrefix.endsWith(':root:')) {
+      try { const guest = JSON.parse(sessionStorage.getItem('altar-login-draft')); if (guest) stored = { content: guest.content, revision: 0, baseline: null } } catch {}
+    }
+    if (!stored) {
+      let legacyPrefix = draftPrefix
+      if (draftPrefix.startsWith('account:') && draftPrefix.endsWith(':root:')) {
+        try {
+          const edit = JSON.parse(readLocal('altar-edit-v1'))
+          if (edit?.userId && draftPrefix === `account:${edit.userId}:root:`) legacyPrefix = ''
+        } catch {}
+      }
+      const legacy = loadSavedObjects(legacyPrefix, null)
+      if (legacy) {
+        const rawPhoto = readLocal(legacyPrefix + PHOTO_KEY)
+        let legacyPhoto = rawPhoto
+        try { legacyPhoto = JSON.parse(rawPhoto) } catch {}
+        stored = { content: { objects: legacy, photo: legacyPhoto, clothColor: readLocal(legacyPrefix + CLOTH_COLOR_KEY, DEFAULT_CLOTH_COLOR), name: readLocal(legacyPrefix + 'altar-name-v1', initialAltar?.name ?? 'Mi altar') }, slug: initialAltar?.slug, revision: 0, baseline: null }
+      }
+    }
+    if (stored && !stored.slug && draftPrefix.startsWith('account:') && draftPrefix.endsWith(':root:')) {
+      try {
+        const edit = JSON.parse(readLocal('altar-edit-v1'))
+        if (edit?.slug && edit?.editToken && (!edit.userId || draftPrefix === `account:${edit.userId}:root:`)) {
+          stored = { ...stored, slug: edit.slug, editToken: edit.editToken, revision: 0 }
+        }
+      } catch {}
+    }
+    return restoreDraft(initialAltar, stored)
+  })
+  useEffect(() => {
+    if (draftPrefix.startsWith('account:') && draftPrefix.endsWith(':root:')) {
+      try { sessionStorage.removeItem('altar-login-draft') } catch {}
+    }
+  }, [])
+  const [templatesOpen, setTemplatesOpen] = useState(false)
   const [objects, setObjects] = useState(() => {
-    const saved = loadSavedObjects(draftPrefix, initialAltar?.objects ?? [])
+    const saved = restoreScene(workspace.content.objects)
     nextId = saved.reduce((max, o) => Math.max(max, o.id), 0) + 1
     return saved
   })
@@ -182,13 +223,7 @@ export default function AltarEditor({ initialAltar = null, draftPrefix = '' }) {
     setCanUndo(true)
   }, [])
 
-  const [photo, setPhoto] = useState(() => {
-    const saved = readLocal(draftPrefix + PHOTO_KEY)
-    if (!draftPrefix) return saved
-    try { return saved === null ? initialAltar?.photo_url ?? null : JSON.parse(saved) }
-    catch { return initialAltar?.photo_url ?? null }
-  })
-  const [isSharing, setIsSharing] = useState(false)
+  const [photo, setPhoto] = useState(workspace.content.photo)
   // Modal de compartir (redes sociales + link): null mientras está cerrado.
   const [shareInfo, setShareInfo] = useState(null)
   // Captura (data URL) mostrada en el modal de confirmación previo a
@@ -203,10 +238,40 @@ export default function AltarEditor({ initialAltar = null, draftPrefix = '' }) {
   }, [])
   useEffect(() => () => clearTimeout(toastTimerRef.current), [])
 
-  const [clothColor, setClothColor] = useState(
-    () => isColor(readLocal(draftPrefix + CLOTH_COLOR_KEY, initialAltar?.cloth_color ?? DEFAULT_CLOTH_COLOR)) ? readLocal(draftPrefix + CLOTH_COLOR_KEY, initialAltar?.cloth_color ?? DEFAULT_CLOTH_COLOR) : DEFAULT_CLOTH_COLOR,
-  )
-  const draft = useDraftPersistence(objects, photo, clothColor, draftPrefix)
+  const [clothColor, setClothColor] = useState(workspace.content.clothColor ?? DEFAULT_CLOTH_COLOR)
+  const [altarName, setAltarName] = useState(workspace.content.name)
+  const applyContent = (value) => {
+    setObjects(restoreScene(value.objects))
+    nextId = Math.max(0, ...value.objects.map(o => o.id)) + 1
+    setPhoto(value.photo)
+    setClothColor(value.clothColor ?? DEFAULT_CLOTH_COLOR)
+    setAltarName(value.name)
+    setSelectedIds([])
+    historyRef.current = []
+    futureRef.current = []
+    setCanUndo(false)
+    setCanRedo(false)
+  }
+  const content = { objects, photo, clothColor, name: altarName }
+  const cloud = useCloudDraft(content, applyContent, workspace, draftPrefix)
+  const isSharing = cloud.busy
+  const draft = { status: cloud.localError ? 'error' : 'saved', retry: cloud.retryLocal }
+  const useTemplate = (id) => {
+    const next = createTemplate(id)
+    if (objects.length || photo) {
+      if (!writeLocal(draftPrefix + 'recovery-v2', JSON.stringify(content))) {
+        showToast('No se pudo respaldar tu altar. Libera espacio antes de cambiar de plantilla.', 'error')
+        return
+      }
+    }
+    pushHistory()
+    setObjects(next.objects)
+    setClothColor(next.clothColor)
+    nextId = next.objects.length + 1
+    setSelectedIds([])
+    setTemplatesOpen(false)
+    showToast('Plantilla lista. Puedes mover cada ofrenda y añadir tu fotografía.')
+  }
 
   const uploadPhoto = async (file) => {
     if (!file) return
@@ -238,33 +303,12 @@ export default function AltarEditor({ initialAltar = null, draftPrefix = '' }) {
     withCleanCanvas((canvas) => setSharePreview(canvas.toDataURL('image/jpeg', 0.8)))
   }
 
-  // Guardar vuelve a verificar la sesión y la propiedad en el servidor.
-  const [altarName, setAltarName] = useState(() => readLocal(draftPrefix + 'altar-name-v1', initialAltar?.name ?? 'Mi altar'))
-  useEffect(() => { writeLocal(draftPrefix + 'altar-name-v1', altarName) }, [altarName, draftPrefix])
-  const savedSlug = useRef(initialAltar?.slug ?? (initialAltar ? readLocal(draftPrefix + 'altar-slug-v1') : null))
   const shareAltar = async () => {
-    if (isSharing) return
-
-    setIsSharing(true)
-    try {
-      const { slug, remaining, limit, updated } = await saveSharedAltar({ objects, photo, clothColor, name: altarName, slug: savedSlug.current, managed: Boolean(initialAltar) })
-      savedSlug.current = slug
-      if (initialAltar) writeLocal(draftPrefix + 'altar-slug-v1', slug)
-      const url = `${window.location.origin}${window.location.pathname}#/ver/${slug}`
-      copyToClipboard(url) // best-effort, el modal ya deja copiar a mano
-
-      const limitNote =
-        typeof remaining === 'number' && typeof limit === 'number'
-          ? ` Te quedan ${remaining} de ${limit} compartidos esta hora.`
-          : ''
-      const note =
-        (updated ? 'Cambios guardados en el mismo enlace de siempre.' : 'Tu altar ya está publicado.') + limitNote
-      setShareInfo({ url, note })
-    } catch (err) {
-      showToast(err?.message || 'No se pudo compartir el altar. Probá de nuevo en un momento.', 'error')
-    } finally {
-      setIsSharing(false)
-    }
+    const result = await cloud.save(true)
+    if (!result) return
+    const url = `${window.location.origin}${window.location.pathname}#/ver/${result.slug}`
+    copyToClipboard(url)
+    setShareInfo({ url, note: result.updated ? 'Versión publicada. El enlace sigue siendo el mismo.' : 'Tu altar ya está publicado.' })
   }
 
   // Deselecciona (para que no salga el gizmo en la imagen), espera a que se
@@ -521,13 +565,36 @@ export default function AltarEditor({ initialAltar = null, draftPrefix = '' }) {
       <div className="altar-name-control">
         <label htmlFor="altar-name">Nombre de tu altar</label>
         <div className="shape-row"><input id="altar-name" maxLength={120} value={altarName} onChange={e => setAltarName(e.target.value)} />
-        <button className="btn btn--primary" disabled={isSharing || !objects.length} onClick={shareAltar}>{isSharing ? 'Guardando…' : 'Guardar altar'}</button></div>
-        <span>Se guarda con un enlace para compartir.</span>
+        <button className="btn btn--primary" disabled={isSharing || !!cloud.conflict} onClick={() => cloud.save(false)}>{isSharing ? 'Guardando…' : 'Guardar borrador'}</button></div>
+        <p role="status">{!cloud.online ? 'Sin conexión. Tus cambios se conservan en este navegador.' : cloud.busy ? 'Sincronizando…' : cloud.dirty ? 'Cambios pendientes de sincronizar' : 'Sincronizado con tu cuenta'}{cloud.updated_at && ` · Última sincronización: ${new Date(cloud.updated_at).toLocaleString('es-MX')}`}</p>
+        <span>{cloud.is_published ? 'Los cambios del borrador solo aparecen en el enlace al publicar.' : 'Borrador privado. Solo será visible cuando lo publiques.'}</span>
+        <div className="shape-row"><button className="btn" disabled={isSharing || !!cloud.conflict} onClick={requestShare}>{cloud.is_published ? 'Publicar cambios' : 'Publicar altar'}</button><button className="btn" onClick={() => setTemplatesOpen(true)}>Plantillas</button></div>
+        {cloud.error && <p role="alert">{cloud.error} <button className="btn" disabled={isSharing || !!cloud.conflict} onClick={() => cloud.save(false)}>Reintentar</button></p>}
+        {cloud.localError && <p role="alert">No se pudo guardar la copia local. <button className="btn" onClick={cloud.retryLocal}>Reintentar</button></p>}
+        {readLocal(draftPrefix + 'recovery-v2') && <button className="menu-about-link" onClick={cloud.restoreRecovery}>Recuperar copia anterior</button>}
       </div>
       {!menuOpen && <div className="draft-status" role="status">
         {draft.status === 'saving' ? 'Guardando…' : draft.status === 'saved' ? 'Guardado en este navegador' : 'No se pudo guardar en este navegador'}
         {draft.status === 'error' && <button className="btn" onClick={draft.retry}>Reintentar</button>}
       </div>}
+      {cloud.conflict && <Modal label="Cambios en otro dispositivo" className="message-form" onClose={() => {}}>
+        <h2>Hay dos versiones de tu altar</h2>
+        <p>Tu copia local tiene cambios y existe una versión más reciente en tu cuenta. Elige cuál quieres conservar antes de sincronizar.</p>
+        <p>En tu cuenta: {cloud.conflict.name} · {new Date(cloud.conflict.updated_at).toLocaleString('es-MX')} · {cloud.conflict.objects.length} objetos</p>
+        <p>En este navegador: {altarName} · {objects.length} objetos</p>
+        <button className="btn btn--primary" onClick={() => cloud.resolve(false)}>Usar versión de mi cuenta</button>
+        <button className="btn" onClick={() => cloud.resolve(true)}>Conservar mis cambios locales</button>
+        <p>Si eliges la versión de tu cuenta, podrás recuperar tu copia local desde «Recuperar copia anterior».</p>
+      </Modal>}
+      {templatesOpen && <Modal label="Elegir plantilla" className="message-form template-picker" onClose={() => setTemplatesOpen(false)}>
+        <h2>Un punto de partida para tu homenaje</h2>
+        <p>La plantilla sustituye la decoración y el mantel; conserva tu fotografía. Guardaremos una copia de tu composición anterior.</p>
+        <div className="template-grid">{TEMPLATES.map(t => <button className="template-card" key={t.id} onClick={() => useTemplate(t.id)}>
+          <img src={t.objects[t.objects.length - 1].modelPath.replace('/models/altar/', '/models/altar-thumbnails/').replace('.glb', '.png')} alt="" />
+          <strong>{t.name}</strong><span>{t.description}</span><small>{t.objects.length} ofrendas · Editable</small>
+        </button>)}</div>
+        <button className="btn" onClick={() => setTemplatesOpen(false)}>Seguir con mi altar</button>
+      </Modal>}
       <Canvas
         shadows
         dpr={[1, 1.5]}
@@ -622,7 +689,6 @@ export default function AltarEditor({ initialAltar = null, draftPrefix = '' }) {
       {shareInfo && (
         <ShareModal url={shareInfo.url} note={shareInfo.note} onClose={() => {
           setShareInfo(null)
-          if (initialAltar && !initialAltar.slug && savedSlug.current) window.location.hash = `#/mis-altares/editar/${savedSlug.current}`
         }} />
       )}
       {sharePreview && (

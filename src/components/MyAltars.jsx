@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient.js'
 import { listMyAltars, deleteMyAltar } from '../storage.js'
 import { isValidScene } from '../../supabase/functions/_shared/scene-validation.js'
+import { readLocal } from '../localStore.js'
 import UserAccount from './UserAccount.jsx'
 import AltarEditor from '../AltarEditor.jsx'
 import Modal from './Modal.jsx'
@@ -27,7 +28,11 @@ export default function MyAltars({ route }) {
   const slug = route.match(/^#\/mis-altares\/editar\/([a-z0-9]+)$/)?.[1]
   const isNew = /^#\/mis-altares\/nuevo(?:\/[a-z0-9-]+)?$/.test(route)
   const newKey = route.split('/')[3] || 'new'
-  const selected = slug && altars?.find(a => a.slug === slug)
+  let resumedSlug = null
+  if (user && isNew) {
+    try { resumedSlug = JSON.parse(readLocal(`account:${user.id}:${newKey}:workspace-v2`))?.slug } catch {}
+  }
+  const selected = altars?.find(a => a.slug === (slug || resumedSlug))
   if (user && altars && ((selected && isValidScene(selected.objects)) || (isNew && altars.length < 3))) {
     return <AltarEditor key={`${user.id}:${slug || newKey}`} initialAltar={selected || { objects: [], name: 'Mi altar' }} draftPrefix={`account:${user.id}:${slug || newKey}:`} />
   }
@@ -37,7 +42,7 @@ export default function MyAltars({ route }) {
     try {
       await deleteMyAltar(deleting.slug)
       // Discard only the deleted altar's local draft.
-      for (const key of ['altar-objects-v1', 'altar-photo-v1', 'altar-cloth-color-v1']) {
+      for (const key of ['altar-objects-v1', 'altar-photo-v1', 'altar-cloth-color-v1', 'altar-name-v1', 'altar-slug-v1', 'workspace-v2', 'recovery-v2']) {
         try { localStorage.removeItem(`account:${user.id}:${deleting.slug}:${key}`) } catch {}
       }
       setAltars(rows => rows.filter(a => a.slug !== deleting.slug))
@@ -64,8 +69,8 @@ export default function MyAltars({ route }) {
         <div className="my-altars-grid">{altars.map(altar => <article className="my-altar-card" key={altar.slug}>
           <div className="my-altar-cover">{altar.photo_url ? <img src={altar.photo_url} alt="" /> : <span aria-hidden="true">✺</span>}</div>
           <h2>{altar.name}</h2>
-          <p>{new Date(altar.created_at).toLocaleDateString('es-MX')} · {altar.status === 'hidden' ? 'Oculto por moderación' : 'Publicado'}</p>
-          <div className="shape-row"><a className="btn btn--primary" href={`#/mis-altares/editar/${altar.slug}`}>Editar</a><a className="btn" href={`#/ver/${altar.slug}`}>Ver altar</a></div>
+          <p>{new Date(altar.created_at).toLocaleDateString('es-MX')} · {!altar.is_published ? 'Borrador privado' : altar.status === 'hidden' ? 'Oculto por moderación' : 'Publicado'}</p>
+          <div className="shape-row"><a className="btn btn--primary" href={`#/mis-altares/editar/${altar.slug}`}>Editar</a>{altar.is_published && <a className="btn" href={`#/ver/${altar.slug}`}>Ver altar</a>}</div>
           <button className="btn btn--danger btn--block" onClick={() => setDeleting(altar)}>Eliminar</button>
         </article>)}</div>
       </>}

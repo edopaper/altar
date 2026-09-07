@@ -52,6 +52,7 @@ Deno.serve(async (req) => {
     .from("altars")
     .select("slug")
     .eq("slug", slug)
+    .eq("is_published", true)
     .maybeSingle();
 
   if (fetchError || !altar) {
@@ -81,7 +82,7 @@ Deno.serve(async (req) => {
   // simultáneos se pisen entre sí y el conteo quede corto.
   const { data: result, error: incrementError } = await supabase
     .rpc("increment_altar_report", { p_slug: slug, p_hide_threshold: HIDE_THRESHOLD })
-    .single();
+    .single<{ reported_count: number }>();
 
   if (incrementError || !result) {
     return json({ error: "No se pudo registrar el reporte." }, 500);

@@ -32,6 +32,10 @@ export default function UserAccount({ compact = false }) {
   const login = async () => {
     setBusy(true)
     setError('')
+    try {
+      const guest = localStorage.getItem('workspace-v2')
+      if (guest && (!window.location.hash || window.location.hash === '#/')) sessionStorage.setItem('altar-login-draft', guest)
+    } catch {}
     rememberLoginRoute(USER_LOGIN_REDIRECT_KEY, window.location.hash || '#/')
     try {
       const { error: loginError } = await supabase.auth.signInWithOAuth({

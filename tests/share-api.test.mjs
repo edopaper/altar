@@ -8,18 +8,28 @@ let clientCalls = 0
 const writes = []
 let testUser = { id: 'user-1' }
 let existingOwner = null
+let lookupMissing = false
+let storedRevision = 0
 let insertFailure = null
+let uploads = 0
+let removals = 0
 globalThis.__edgeTestClient = () => {
   clientCalls++
   return {
     auth: { getUser: async () => ({ data: { user: testUser }, error: null }) },
-    rpc: () => ({ data: true, error: null, single: async () => ({ data: { allowed: true, remaining: 4 }, error: null }) }),
-    from: () => ({
-      select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { edit_token: 'valid-token', owner_id: existingOwner, photo_url: 'https://example.test/photo.jpg' }, error: null }) }) }),
+    rpc: (name, args) => {
+      if (name === 'commit_altar_draft') {
+        writes.push({ ...args.p_content, photo_url: args.p_photo_url, owner_id: args.p_user, publish: args.p_publish, revision: args.p_revision })
+        return { data: { slug: args.p_slug, revision: args.p_revision + 1, is_published: args.p_publish }, error: insertFailure }
+      }
+      return { data: true, error: null, single: async () => ({ data: { allowed: true, remaining: 4 }, error: null }) }
+    },
+    from: (table) => table === 'altar_drafts' ? ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { revision: storedRevision }, error: null }) }) }) }) : ({
+      select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: lookupMissing ? null : { edit_token: 'valid-token', owner_id: existingOwner, photo_url: 'https://example.test/photo.jpg' }, error: null }) }) }),
       insert: async (data) => { writes.push(data); return { error: insertFailure } },
       update: (data) => ({ eq: async () => { writes.push(data); return { error: null } } }),
     }),
-    storage: { from: () => ({ upload: async () => ({ error: null }), getPublicUrl: () => ({ data: { publicUrl: 'https://example.test/photo.jpg' } }) }) },
+    storage: { from: () => ({ upload: async () => { uploads++; return { error: null } }, remove: async () => { removals++; return { error: null } }, getPublicUrl: () => ({ data: { publicUrl: 'https://example.test/photo.jpg' } }) }) },
   }
 }
 globalThis.Deno = { env: { get: () => 'mock' }, serve: (fn) => { handler = fn } }
@@ -93,4 +103,67 @@ test('el límite de base de datos se devuelve como un conflicto de cupo', async 
   assert.equal(response.status, 409)
   assert.match((await response.json()).error, /3 altares/)
   insertFailure = null
+})
+
+test('guardar una foto privada no la sube al bucket público', async () => {
+  const before = uploads
+  const response = await handler(request({ objects: [shape], action: 'save', photo: 'data:image/jpeg;base64,/9j/' }))
+  assert.equal(response.status, 200)
+  assert.equal(uploads, before)
+  assert.equal(writes.at(-1).publish, false)
+  assert.equal(writes.at(-1).photo, 'data:image/jpeg;base64,/9j/')
+})
+test('publicar sube una nueva imagen y usa la revisión enviada', async () => {
+  storedRevision = 7
+  const before = uploads
+  existingOwner = 'user-1'
+  const response = await handler(request({ objects: [shape], slug: 'abc12', revision: 7, action: 'publish', photo: 'data:image/jpeg;base64,/9j/' }))
+  assert.equal(response.status, 200)
+  assert.equal(uploads, before + 1)
+  assert.equal(writes.at(-1).revision, 7)
+  assert.equal(writes.at(-1).publish, true)
+  storedRevision = 0
+  existingOwner = null
+})
+test('un conflicto devuelve 409 y limpia la foto subida sin sobrescribir la anterior', async () => {
+  insertFailure = { code: '40001' }
+  const before = removals
+  const response = await handler(request({ objects: [shape], action: 'publish', photo: 'data:image/jpeg;base64,/9j/' }))
+  assert.equal(response.status, 409)
+  assert.equal((await response.json()).conflict, true)
+  assert.equal(removals, before + 1)
+  insertFailure = null
+})
+test('la API rechaza acciones y revisiones inválidas', async () => {
+  for (const value of [{ action: 'delete' }, { revision: -1 }, { revision: 1.5 }, { slug: '../../file' }, { draftId: 'invalid' }]) {
+    assert.equal((await handler(request({ objects: [shape], ...value }))).status, 400)
+  }
+})
+
+test('el primer guardado usa un identificador estable y el reintento detecta la versión existente', async () => {
+  const draftId = 'a'.repeat(32)
+  lookupMissing = true
+  let response = await handler(request({ objects: [shape], action: 'save', draftId }))
+  assert.equal(response.status, 200)
+  assert.equal((await response.json()).slug, draftId)
+  lookupMissing = false
+  existingOwner = 'user-1'
+  insertFailure = { code: '40001' }
+  response = await handler(request({ objects: [shape], action: 'save', draftId }))
+  assert.equal(response.status, 409)
+  assert.equal((await response.json()).conflict, true)
+  existingOwner = null
+  insertFailure = null
+})
+
+test('una foto de una publicación anterior devuelve conflicto antes de validarla', async () => {
+  existingOwner = 'user-1'
+  storedRevision = 3
+  const before = writes.length
+  const response = await handler(request({ objects: [shape], slug: 'abc12', revision: 2, action: 'save', photo: 'https://example.test/old-photo.jpg' }))
+  assert.equal(response.status, 409)
+  assert.equal((await response.json()).conflict, true)
+  assert.equal(writes.length, before)
+  existingOwner = null
+  storedRevision = 0
 })

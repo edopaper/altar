@@ -20,6 +20,11 @@ function useHashRoute() {
 
 export default function App() {
   const hash = useHashRoute()
+  const [account, setAccount] = useState(undefined)
+  useEffect(() => {
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => setAccount(session?.user?.id ?? null))
+    return () => data.subscription.unsubscribe()
+  }, [])
 
   // Tras volver del login con GitHub (sin hash propio en el redirectTo, para
   // no chocar con supabase-js al parsear el token de la URL), si el usuario
@@ -41,5 +46,6 @@ export default function App() {
   if (viewMatch) return <AltarViewer key={viewMatch[1]} slug={viewMatch[1]} />
   if (hash.startsWith('#/mis-altares')) return <MyAltars key={hash} route={hash} />
   if (hash.startsWith('#/admin')) return <AdminDashboard />
-  return <AltarEditor />
+  if (account === undefined) return <p role="status">Cargando cuenta…</p>
+  return <AltarEditor key={account ?? 'guest'} draftPrefix={account ? `account:${account}:root:` : ''} />
 }

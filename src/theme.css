@@ -158,3 +158,11 @@ input { accent-color: var(--ofrenda-gold); }
 }
 
 .menu-my-altars { flex: none; text-decoration: none; text-align: center; }
+
+.altar-name-control { padding: 12px; background: var(--ofrenda-panel); border: 1px solid var(--ofrenda-border); border-radius: 12px; width: 340px; max-height: 42dvh; overflow-y: auto; }
+.altar-name-control > .shape-row { margin-top: 8px; }
+.altar-name-control p { line-height: 1.45; color: var(--ofrenda-muted); }
+@media (max-width: 640px) {
+  .altar-name-control { top: auto; bottom: 12px; left: 12px; width: calc(100% - 24px); max-height: 32dvh; }
+  .app--menu-open .menu-body { padding-bottom: 290px; }
+}

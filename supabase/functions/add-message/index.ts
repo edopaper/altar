@@ -68,6 +68,7 @@ Deno.serve(async (req) => {
     .from("altars")
     .select("slug")
     .eq("slug", slug)
+    .eq("is_published", true)
     .maybeSingle();
 
   if (fetchError || !altar) {

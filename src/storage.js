@@ -31,25 +31,36 @@ async function invokeShareAltar(body) {
   const { data, error } = await supabase.functions.invoke('share-altar', { body })
 
   if (error) {
-    let message = 'No se pudo compartir el altar.'
+    let message = 'No se pudo guardar el altar.'
+    let conflict = false
     try {
       const errorBody = await error.context?.json()
       if (errorBody?.error) message = errorBody.error
+      conflict = Boolean(errorBody?.conflict)
     } catch {
       // Sin body legible (ej. error de red): se usa el mensaje genérico.
     }
-    throw new Error(message)
+    throw Object.assign(new Error(message), { conflict })
   }
 
   return data
 }
 
-export async function saveSharedAltar({ objects, photo, name, clothColor, slug, managed = false }) {
+export async function saveSharedAltar({ objects, photo, name, clothColor, slug, managed = false, revision = 0, action = 'publish', expectedUserId, editToken, draftId }) {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) throw new Error('Inicia sesión para guardar tus altares.')
+  if (expectedUserId && session.user.id !== expectedUserId) throw new Error('La cuenta cambió. Vuelve a abrir tu altar.')
+  // A previous deployment ignores `action` and publishes every save. Probe
+  // without scene data first: old servers reject this without writing anything.
+  try {
+    const capabilities = await invokeShareAltar({ action: 'capabilities' })
+    if (capabilities?.draftProtocol !== 2) throw new Error('Unsupported protocol')
+  } catch {
+    throw new Error('No se pudo verificar el guardado privado. Revisa tu conexión o actualiza el servidor. Tu copia local se conserva.')
+  }
   const editInfo = managed ? null : loadEditInfo(session.user.id)
-  const body = { objects, photo, name, clothColor }
-  if (slug) body.slug = slug
+  const body = { objects, photo, name, clothColor, revision, action, ...(!slug && draftId ? { draftId } : {}) }
+  if (slug) { body.slug = slug; if (editToken) body.editToken = editToken }
   else if (editInfo) Object.assign(body, editInfo)
   const data = await invokeShareAltar(body)
   if (!data?.slug) throw new Error('No se pudo compartir el altar.')
