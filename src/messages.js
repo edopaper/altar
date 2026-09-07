@@ -7,29 +7,8 @@ import { supabase } from './supabaseClient.js'
 export const MAX_MESSAGE_LENGTH = 60
 export const MAX_NAME_LENGTH = 20
 
-// Chequeo rápido en el cliente para feedback inmediato antes de llamar a la
-// Edge Function; la validación real (fuente de verdad) pasa por el server.
-const BLOCKLIST = [
-  'puto', 'puta', 'putos', 'putas',
-  'maricon', 'pendejo', 'pendeja', 'pendejos', 'pendejas',
-  'mierda', 'verga', 'cabron', 'cabrona',
-  'idiota', 'estupido', 'estupida', 'imbecil',
-  'zorra', 'perra', 'joder', 'coño', 'carajo',
-  'nazi',
-]
-
-function normalize(text) {
-  return text
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9\s]/g, '')
-}
-
-export function containsBlockedWord(text) {
-  const normalized = normalize(text)
-  return BLOCKLIST.some((word) => normalized.includes(word))
-}
+import { containsForbiddenWord } from '../supabase/functions/_shared/forbidden-words.js'
+export const containsBlockedWord = containsForbiddenWord
 
 export function validateMessage(text) {
   const trimmed = (text ?? '').trim().replace(/\s+/g, ' ')
@@ -43,16 +22,16 @@ export function validateMessage(text) {
   return { ok: true, text: trimmed }
 }
 
-// Todos los mensajes visibles de un altar, del más viejo al más nuevo.
-export async function loadMessages(slug) {
-  const { data, error } = await supabase
-    .from('messages')
-    .select('id, text, author, created_at')
-    .eq('slug', slug)
-    .order('created_at', { ascending: true })
-
-  if (error) return []
-  return data
+// Paginación por identificador: evita descargar una lista ilimitada y saltos por borrados.
+export async function loadMessages(slug, { afterId = null, pageSize = 50 } = {}) {
+  const size = Math.max(1, Math.min(100, Math.floor(pageSize) || 50))
+  let query = supabase.from('messages').select('id, text, author, created_at')
+    .eq('slug', slug).order('id', { ascending: true }).limit(size + 1)
+  if (afterId !== null) query = query.gt('id', afterId)
+  const { data, error } = await query
+  if (error) throw error
+  const items = (data ?? []).slice(0, size)
+  return { items, hasMore: (data?.length ?? 0) > size, nextCursor: items.at(-1)?.id ?? afterId }
 }
 
 export async function saveMessage(slug, { text, author }) {

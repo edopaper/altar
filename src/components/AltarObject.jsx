@@ -1,3 +1,4 @@
+import SceneErrorBoundary from './SceneErrorBoundary.jsx'
 import { Suspense, useRef } from 'react'
 import * as THREE from 'three'
 import { useFrame } from '@react-three/fiber'
@@ -85,9 +86,11 @@ export default function AltarObject({
 
   const content =
     object.type === 'model' ? (
-      <Suspense fallback={<LoadingCube />}>
-        <ModelLoader path={object.modelPath} />
-      </Suspense>
+      <SceneErrorBoundary key={object.modelPath}>
+        <Suspense fallback={<LoadingCube />}>
+          <ModelLoader path={object.modelPath} />
+        </Suspense>
+      </SceneErrorBoundary>
     ) : object.type === 'paper' ? (
       <PaperCutout path={object.paperPath} color={object.color} />
     ) : (
@@ -106,6 +109,7 @@ export default function AltarObject({
     <>
       <group
         ref={groupRef}
+        name={`altar-object-${object.id}`}
         position={object.position}
         rotation={object.rotation}
         scale={object.scale}

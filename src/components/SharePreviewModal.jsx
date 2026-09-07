@@ -1,10 +1,10 @@
+import Modal from './Modal.jsx'
 // Confirmación visual previa a compartir: muestra una captura de la escena
 // tal como está ahora, para revisar el encuadre antes de publicar. Recién
 // al confirmar se llama a la Edge Function (o se reusa el link cacheado).
 export default function SharePreviewModal({ image, onConfirm, onClose }) {
   return (
-    <div className="message-overlay" onClick={onClose}>
-      <div className="message-form publish-form" onClick={(e) => e.stopPropagation()}>
+    <Modal onClose={onClose} label="Vista previa del altar" className="message-form publish-form">
         <h2>¿Así se ve tu altar?</h2>
         <img className="share-preview-img" src={image} alt="Vista previa del altar" />
         <p className="publish-note">
@@ -18,7 +18,6 @@ export default function SharePreviewModal({ image, onConfirm, onClose }) {
             Compartir
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }

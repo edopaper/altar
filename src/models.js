@@ -1,11 +1,4 @@
-// Descubre dinámicamente los .glb en /public/models/altar/ y sus subcarpetas
-// (sin hardcodear nombres). Las claves del glob incluyen el prefijo /public,
-// que no existe en runtime: se recorta.
-const globbed = import.meta.glob('/public/models/altar/**/*.glb', {
-  eager: true,
-  query: '?url',
-  import: 'default',
-})
+import { modelPaths } from '../supabase/functions/_shared/catalog.js'
 
 // Nombre bonito para cada subcarpeta; una carpeta nueva sin entrada aquí
 // aparece igual, con su nombre capitalizado.
@@ -29,9 +22,9 @@ function prettify(slug) {
   return label.charAt(0).toUpperCase() + label.slice(1)
 }
 
-export const MODEL_LIST = Object.keys(globbed)
+export const MODEL_LIST = modelPaths
   .map((key) => {
-    const path = key.replace(/^\/public/, '')
+    const path = key
     const parts = key.split('/')
     const name = prettify(parts.pop().replace(/\.glb$/, ''))
     // Subcarpeta entre .../altar/ y el archivo; sin subcarpeta cae en "varios"

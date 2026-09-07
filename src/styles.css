@@ -1387,3 +1387,20 @@ canvas {
   color: #1a0d0d;
   font-weight: 600;
 }
+
+.draft-status { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 5; padding: 6px 10px; border-radius: 8px; background: #30243de6; color: #fff; font-size: 12px; max-width: 65vw; }
+.draft-status .btn { margin-left: 8px; }
+.quality-controls { margin-top: 10px; color: #fff; background: #30243ded; border-radius: 8px; padding: 8px; font-size: 12px; }
+.quality-controls summary { cursor: pointer; }
+.quality-controls label { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+.quality-controls select { max-width: 130px; }
+.loading-notice { position: absolute; top: 50%; left: 50%; z-index: 30; background: #30243d; color: white; padding: 16px; border-radius: 8px; }
+.message-error { overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
+
+.quality-controls--floating { position: absolute; right: 12px; top: 62px; z-index: 6; margin-top: 0; }
+@media (max-width: 640px) {
+  .app--menu-open > .toolbar-group,
+  .app--menu-open > .capture-btn,
+  .app--menu-open > .music-player { visibility: hidden; }
+}

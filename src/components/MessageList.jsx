@@ -1,3 +1,4 @@
+import Modal from './Modal.jsx'
 import { useState } from 'react'
 import { reportMessage } from '../messages.js'
 
@@ -10,7 +11,7 @@ function formatDate(iso) {
 }
 
 /** Overlay con la lista completa de mensajes del altar, cada uno con su propio botón de reporte. */
-export default function MessageList({ messages, onClose }) {
+export default function MessageList({ messages, onClose, loading = false, loadError = '', hasMore = false, onLoadMore, onRefresh }) {
   const [reportedIds, setReportedIds] = useState([])
   const [busyId, setBusyId] = useState(null)
   const [error, setError] = useState('')
@@ -35,12 +36,14 @@ export default function MessageList({ messages, onClose }) {
   }
 
   return (
-    <div className="message-overlay" onClick={onClose}>
-      <div className="message-list-panel" onClick={(e) => e.stopPropagation()}>
+    <Modal onClose={onClose} label="Mensajes del altar" className="message-list-panel">
         <h2>Mensajes del altar</h2>
 
-        {messages.length === 0 && <p className="admin-empty">Todavía no hay mensajes.</p>}
+        {messages.length === 0 && !loading && !loadError && <p className="admin-empty">Todavía no hay mensajes.</p>}
 
+        {loading && <p role="status">Cargando mensajes…</p>}
+        {loadError && <p className="message-error" role="alert">{loadError}</p>}
+        <button className="btn" disabled={loading} onClick={onRefresh}>{loadError ? 'Reintentar' : 'Actualizar mensajes'}</button>
         <div className="message-list">
           {messages.map((m) => (
             <div key={m.id} className="message-list-item">
@@ -63,6 +66,7 @@ export default function MessageList({ messages, onClose }) {
           ))}
         </div>
 
+        {hasMore && <button className="btn" disabled={loading} onClick={onLoadMore}>Cargar más mensajes</button>}
         {error && <div className="message-error">{error}</div>}
 
         <div className="shape-row message-actions">
@@ -70,7 +74,6 @@ export default function MessageList({ messages, onClose }) {
             Cerrar
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }

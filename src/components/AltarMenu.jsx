@@ -1,3 +1,4 @@
+import { QualityControls } from '../QualityContext.jsx'
 import { useEffect, useState } from 'react'
 
 const SHAPES = [
@@ -94,6 +95,7 @@ export default function AltarMenu({
   clothColor,
   onClothColorChange,
   onHide,
+  draft,
   maxObjects,
   objectsWarningAt,
   onShowAbout,
@@ -370,7 +372,11 @@ export default function AltarMenu({
         <button className="btn btn--danger btn--block" onClick={onClearAltar} disabled={objects.length === 0}>
           Limpiar altar
         </button>
-        <div className="menu-note">La escena se guarda sola en este navegador.</div>
+        <div className="menu-note" role="status">
+          {draft?.status === 'saving' ? 'Guardando…' : draft?.status === 'error' ? 'No se pudo guardar en este navegador' : 'Guardado en este navegador'}
+          {draft?.status === 'error' && <button className="btn" onClick={draft.retry}>Reintentar</button>}
+        </div>
+        <QualityControls />
       </section>
 
       <div className="menu-hint">

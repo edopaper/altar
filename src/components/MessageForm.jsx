@@ -1,3 +1,4 @@
+import Modal from './Modal.jsx'
 import { useState } from 'react'
 import { MAX_MESSAGE_LENGTH, MAX_NAME_LENGTH, saveMessage } from '../messages.js'
 
@@ -11,21 +12,24 @@ export default function MessageForm({ slug, onClose, onSaved }) {
   const submit = async () => {
     if (sending) return
     setSending(true)
-    const result = await saveMessage(slug, { text, author })
-    setSending(false)
-    if (!result.ok) {
-      setError(result.error)
-      return
+    setError('')
+    try {
+      const result = await saveMessage(slug, { text, author })
+      if (!result.ok) { setError(result.error); return }
+      onSaved(result.message)
+      onClose()
+    } catch {
+      setError('No se pudo publicar el mensaje. Intenta de nuevo.')
+    } finally {
+      setSending(false)
     }
-    onSaved(result.message)
-    onClose()
   }
 
   return (
-    <div className="message-overlay" onClick={onClose}>
-      <div className="message-form" onClick={(e) => e.stopPropagation()}>
+    <Modal onClose={onClose} label="Dejar un mensaje" className="message-form">
         <h2>Dejar un mensaje</h2>
         <textarea
+          aria-label="Mensaje para el altar"
           className="message-textarea"
           value={text}
           onChange={(e) => {
@@ -41,6 +45,7 @@ export default function MessageForm({ slug, onClose, onSaved }) {
           {text.length}/{MAX_MESSAGE_LENGTH}
         </div>
         <input
+          aria-label="Tu nombre (opcional)"
           className="message-input"
           value={author}
           onChange={(e) => setAuthor(e.target.value.slice(0, MAX_NAME_LENGTH))}
@@ -56,7 +61,6 @@ export default function MessageForm({ slug, onClose, onSaved }) {
             {sending ? 'Enviando…' : 'Enviar'}
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }

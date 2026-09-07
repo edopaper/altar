@@ -1,3 +1,4 @@
+import Modal from './Modal.jsx'
 import { useState } from 'react'
 
 const SHARE_TEXT = 'Armé mi altar de muertos. Mirá cómo quedó:'
@@ -73,8 +74,7 @@ export default function ShareModal({ url, note, onClose }) {
   }
 
   return (
-    <div className="message-overlay" onClick={onClose}>
-      <div className="message-form publish-form" onClick={(e) => e.stopPropagation()}>
+    <Modal onClose={onClose} label="Compartir altar" className="message-form publish-form">
         <h2>Compartir altar</h2>
         {note && <p className="publish-note">{note}</p>}
 
@@ -101,7 +101,7 @@ export default function ShareModal({ url, note, onClose }) {
         </div>
 
         <div className="publish-link-row">
-          <input className="publish-link-input" value={url} readOnly onFocus={(e) => e.target.select()} />
+          <input aria-label="Enlace de tu altar" className="publish-link-input" value={url} readOnly onFocus={(e) => e.target.select()} />
           <button className="btn" onClick={copy}>
             {copied ? 'Copiado' : 'Copiar'}
           </button>
@@ -112,7 +112,6 @@ export default function ShareModal({ url, note, onClose }) {
             Cerrar
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }

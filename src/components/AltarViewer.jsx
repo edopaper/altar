@@ -3,7 +3,8 @@ import { Canvas } from '@react-three/fiber'
 import AltarScene from './AltarScene.jsx'
 import MusicPlayer from './MusicPlayer.jsx'
 import { loadSharedAltar, reportAltar } from '../storage.js'
-import { loadMessages } from '../messages.js'
+import useMessagePages from '../useMessagePages.js'
+import { QualityControls } from '../QualityContext.jsx'
 import { supabase } from '../supabaseClient.js'
 import MessageForm from './MessageForm.jsx'
 import MessageList from './MessageList.jsx'
@@ -22,12 +23,16 @@ function useIdle(delayMs) {
       clearTimeout(timer)
       timer = setTimeout(() => setIdle(true), delayMs)
     }
+    window.addEventListener('keydown', wake)
+    window.addEventListener('focusin', wake)
     window.addEventListener('pointerdown', wake)
     window.addEventListener('pointermove', wake)
     window.addEventListener('wheel', wake, { passive: true })
     window.addEventListener('touchstart', wake, { passive: true })
     return () => {
       clearTimeout(timer)
+      window.removeEventListener('keydown', wake)
+      window.removeEventListener('focusin', wake)
       window.removeEventListener('pointerdown', wake)
       window.removeEventListener('pointermove', wake)
       window.removeEventListener('wheel', wake)
@@ -47,7 +52,9 @@ export default function AltarViewer({ slug }) {
   const idle = useIdle(IDLE_DELAY_MS)
   const [data, setData] = useState(null)
   const [status, setStatus] = useState('loading') // 'loading' | 'ready' | 'missing' | 'error'
-  const [messages, setMessages] = useState([])
+  const messagePage = useMessagePages(slug, status === 'ready')
+  const { messages } = messagePage
+  const [retry, setRetry] = useState(0)
   const [showMessageForm, setShowMessageForm] = useState(false)
   const [showMessageList, setShowMessageList] = useState(false)
   const [reportState, setReportState] = useState('idle') // 'idle' | 'sending' | 'sent' | 'error'
@@ -82,9 +89,6 @@ export default function AltarViewer({ slug }) {
         } else {
           setData(altar)
         }
-        loadMessages(slug).then((msgs) => {
-          if (!cancelled) setMessages(msgs)
-        })
         setStatus('ready')
       })
       .catch(() => {
@@ -94,7 +98,7 @@ export default function AltarViewer({ slug }) {
     return () => {
       cancelled = true
     }
-  }, [slug])
+  }, [slug, retry])
 
   const handleReport = () => {
     if (reportState === 'sending' || reportState === 'sent') return
@@ -121,7 +125,8 @@ export default function AltarViewer({ slug }) {
     return (
       <div className="viewer-missing">
         <h1>No se pudo cargar el altar</h1>
-        <p>Hubo un problema de conexión. Probá recargar la página.</p>
+        <p>No pudimos recuperar el contenido. Revisa tu conexión e intenta de nuevo.</p>
+        <button className="btn" onClick={() => setRetry((value) => value + 1)}>Reintentar</button>
         <a className="btn viewer-missing-btn" href="#/">
           Crear mi propio altar
         </a>
@@ -161,7 +166,8 @@ export default function AltarViewer({ slug }) {
           <a href="#/admin">Volver al panel</a>
         </div>
       )}
-      <Canvas shadows camera={{ position: [0, 3.2, 5.5], fov: 50 }}>
+      <QualityControls floating />
+      <Canvas shadows dpr={[1, 1.5]} camera={{ position: [0, 3.2, 5.5], fov: 50 }}>
         <AltarScene
           photo={data.photo}
           clothColor={data.clothColor}
@@ -183,9 +189,9 @@ export default function AltarViewer({ slug }) {
           <button className="btn" onClick={() => setShowMessageForm(true)}>
             Dejar un mensaje
           </button>
-          {messages.length > 0 && (
+          {(
             <button className="btn" onClick={() => setShowMessageList(true)}>
-              Ver mensajes ({messages.length})
+              Ver mensajes ({messages.length}{messagePage.hasMore ? '+' : ''})
             </button>
           )}
           <a className="btn" href="#/">
@@ -210,12 +216,12 @@ export default function AltarViewer({ slug }) {
         <MessageForm
           slug={slug}
           onClose={() => setShowMessageForm(false)}
-          onSaved={(message) => setMessages((prev) => [...prev, message])}
+          onSaved={messagePage.add}
         />
       )}
 
       {showMessageList && (
-        <MessageList messages={messages} onClose={() => setShowMessageList(false)} />
+        <MessageList messages={messages} loading={messagePage.loading} loadError={messagePage.error} hasMore={messagePage.hasMore} onLoadMore={messagePage.loadMore} onRefresh={messagePage.refresh} onClose={() => setShowMessageList(false)} />
       )}
     </div>
   )

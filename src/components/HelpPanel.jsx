@@ -1,3 +1,4 @@
+import Modal from './Modal.jsx'
 // Guía completa de la app, con capturas reales de pantalla (generadas por
 // scripts/generate-help-shots.mjs en public/help/). Complementa al
 // Onboarding de primera visita: aquello es un resumen de 5 líneas, esto es
@@ -76,8 +77,7 @@ const SHORTCUTS = [
 
 export default function HelpPanel({ onClose }) {
   return (
-    <div className="message-overlay" onClick={onClose}>
-      <div className="message-form help-panel" onClick={(e) => e.stopPropagation()}>
+    <Modal onClose={onClose} label="Ayuda" className="message-form help-panel">
         <div className="help-header">
           <h2>¿Cómo funciona?</h2>
           <button className="toast-close" onClick={onClose} aria-label="Cerrar ayuda">
@@ -125,7 +125,6 @@ export default function HelpPanel({ onClose }) {
             Cerrar
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }

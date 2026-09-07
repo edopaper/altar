@@ -1,3 +1,4 @@
+import { isValidScene } from '../supabase/functions/_shared/scene-validation.js'
 // Guardado/lectura de altares compartidos, respaldado por Supabase.
 // Compartir pasa por la Edge Function `share-altar` (valida rate limit por
 // IP, sube la foto y hace el insert con la service role key: el cliente ya
@@ -107,7 +108,9 @@ export async function loadSharedAltar(slug) {
     .eq('slug', slug)
     .maybeSingle()
 
-  if (error || !data) return null
+  if (error) throw new Error('No se pudo cargar el altar. Revisa tu conexión e intenta de nuevo.')
+  if (!data) return null
+  if (!isValidScene(data.objects)) throw new Error('El altar contiene datos incompatibles o dañados.')
 
   return {
     slug: data.slug,

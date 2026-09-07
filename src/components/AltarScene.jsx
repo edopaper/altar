@@ -1,5 +1,7 @@
+import { useQuality } from '../QualityContext.jsx'
+import RenderQuality from './RenderQuality.jsx'
 import { useEffect, useMemo, useRef } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { OrbitControls, TransformControls } from '@react-three/drei'
 import AltarObject from './AltarObject.jsx'
@@ -19,6 +21,7 @@ const FADE_SPEED = 0.15 // suavizado por frame, no es instantáneo
 
 /** Habitación: piso, pared trasera y dos paredes laterales cortas, sin techo. */
 function Room() {
+  const { reducedMotion } = useQuality()
   const wallMat = { color: '#8d7ba8', roughness: 0.95, transparent: true }
   const backRef = useRef()
   const leftRef = useRef()
@@ -30,7 +33,7 @@ function Room() {
     const fade = (mesh, visible) => {
       const mat = mesh.current?.material
       if (!mat) return
-      mat.opacity = THREE.MathUtils.lerp(mat.opacity, visible ? 1 : 0, FADE_SPEED)
+      mat.opacity = reducedMotion ? (visible ? 1 : 0) : THREE.MathUtils.lerp(mat.opacity, visible ? 1 : 0, FADE_SPEED)
     }
     fade(backRef, camera.position.z > BACK_WALL_Z)
     fade(leftRef, camera.position.x > -SIDE_WALL_X)
@@ -166,6 +169,7 @@ function AltarSteps({ clothColor }) {
 }
 
 function CeremonialLights() {
+  const { low } = useQuality()
   return (
     <>
       {/* Base cálida estilo Kind Words: atardecer lavanda, todo legible y suave */}
@@ -176,7 +180,7 @@ function CeremonialLights() {
         intensity={1.1}
         position={[2, 6, 4]}
         castShadow
-        shadow-mapSize={[2048, 2048]}
+        shadow-mapSize={low ? [1024, 1024] : [2048, 2048]}
         shadow-camera-left={-8}
         shadow-camera-right={8}
         shadow-camera-top={8}
@@ -194,7 +198,7 @@ function CeremonialLights() {
         distance={9}
         decay={2}
         position={[-1.8, 1.6, -1.4]}
-        castShadow
+        castShadow={!low}
         shadow-mapSize={[512, 512]}
         shadow-bias={-0.0002}
         shadow-normalBias={0.04}
@@ -205,7 +209,7 @@ function CeremonialLights() {
         distance={9}
         decay={2}
         position={[1.8, 1.6, -1.4]}
-        castShadow
+        castShadow={!low}
         shadow-mapSize={[512, 512]}
         shadow-bias={-0.0002}
         shadow-normalBias={0.04}
@@ -277,7 +281,9 @@ function IdleOrbit({ orbitRef }) {
 // Solo traslada (rotar/escalar en grupo queda fuera del alcance por ahora).
 function GroupTransformControls({ objects, selectedIds, snap, onTranslateMany, onDragStart, onDragEnd, orbitRef }) {
   const pivotRef = useRef()
-  const lastPos = useRef(new THREE.Vector3())
+  const scene = useThree((state) => state.scene)
+  const drag = useRef(null)
+  const delta = useRef(new THREE.Vector3())
   const key = selectedIds.join(',')
 
   // El centroide solo se recalcula cuando cambia el conjunto seleccionado,
@@ -295,8 +301,15 @@ function GroupTransformControls({ objects, selectedIds, snap, onTranslateMany, o
   useEffect(() => {
     if (!pivotRef.current) return
     pivotRef.current.position.copy(centroid)
-    lastPos.current.copy(centroid)
   }, [centroid])
+
+  useEffect(() => () => {
+    if (!drag.current) return
+    for (const target of drag.current.targets) target.node?.position.copy(target.position)
+    drag.current = null
+    if (orbitRef.current) orbitRef.current.enabled = true
+    onDragEnd()
+  }, [key, orbitRef, onDragEnd])
 
   return (
     <>
@@ -307,19 +320,28 @@ function GroupTransformControls({ objects, selectedIds, snap, onTranslateMany, o
         translationSnap={snap ? 0.1 : null}
         onMouseDown={() => {
           if (orbitRef.current) orbitRef.current.enabled = false
+          drag.current = {
+            origin: pivotRef.current.position.clone(),
+            targets: objects.filter((o) => selectedIds.includes(o.id) && !o.locked).map((o) => ({
+              id: o.id, node: scene.getObjectByName(`altar-object-${o.id}`), position: new THREE.Vector3(...o.position),
+            })),
+          }
           onDragStart()
         }}
         onObjectChange={() => {
-          const p = pivotRef.current
-          if (!p) return
-          const delta = p.position.clone().sub(lastPos.current)
-          if (delta.lengthSq() > 0) {
-            onTranslateMany(selectedIds, delta.toArray())
-            lastPos.current.copy(p.position)
+          if (!drag.current || !pivotRef.current) return
+          delta.current.copy(pivotRef.current.position).sub(drag.current.origin)
+          for (const target of drag.current.targets) {
+            target.node?.position.copy(target.position).add(delta.current)
           }
         }}
         onMouseUp={() => {
           if (orbitRef.current) orbitRef.current.enabled = true
+          if (drag.current) {
+            delta.current.copy(pivotRef.current.position).sub(drag.current.origin)
+            if (delta.current.lengthSq() > 0) onTranslateMany(drag.current.targets.map((target) => target.id), delta.current.toArray())
+            drag.current = null
+          }
           onDragEnd()
         }}
       />
@@ -345,6 +367,7 @@ export default function AltarScene({
   clothColor,
 }) {
   const orbitRef = useRef()
+  const { reducedMotion } = useQuality()
 
   // Expone a la UI una función para centrar la cámara en una posición.
   useEffect(() => {
@@ -364,12 +387,13 @@ export default function AltarScene({
       <color attach="background" args={['#4a3a68']} />
       <fog attach="fog" args={['#57457a', 9, 24]} />
 
+      <RenderQuality />
       <CeremonialLights />
       <Room />
       <AltarSteps clothColor={clothColor} />
       <PhotoFrame photo={photo} />
       <CandleLights />
-      <SoulField messages={messages} />
+      {!reducedMotion && <SoulField messages={messages} />}
       <SoulLights />
 
       {objects.map((obj) => (
@@ -378,7 +402,7 @@ export default function AltarScene({
           object={obj}
           selected={selectedIds.includes(obj.id)}
           showGizmo={selectedIds.length === 1}
-          justAdded={obj.id === justAddedId}
+          justAdded={!reducedMotion && obj.id === justAddedId}
           mode={mode}
           snap={snap}
           onSelect={(additive) => onSelect(obj.id, additive)}
@@ -399,7 +423,7 @@ export default function AltarScene({
         />
       )}
 
-      {autoOrbit && <IdleOrbit orbitRef={orbitRef} />}
+      {autoOrbit && !reducedMotion && <IdleOrbit orbitRef={orbitRef} />}
 
       <OrbitControls
         ref={orbitRef}

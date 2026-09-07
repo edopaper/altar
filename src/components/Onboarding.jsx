@@ -1,3 +1,4 @@
+import Modal from './Modal.jsx'
 // Bienvenida de primera visita: lo mínimo para no quedarse mirando un
 // altar vacío sin saber qué hacer. Se muestra una sola vez (App.jsx guarda
 // el flag en localStorage) y se puede cerrar en cualquier momento.
@@ -71,8 +72,7 @@ const STEPS = [
 
 export default function Onboarding({ onClose, onShowHelp }) {
   return (
-    <div className="message-overlay" onClick={onClose}>
-      <div className="message-form onboarding-form" onClick={(e) => e.stopPropagation()}>
+    <Modal onClose={onClose} label="Bienvenido a tu altar" className="message-form onboarding-form">
         <h2>Bienvenido a tu altar</h2>
         <ul className="onboarding-steps">
           {STEPS.map((step, i) => (
@@ -90,7 +90,6 @@ export default function Onboarding({ onClose, onShowHelp }) {
         <button className="menu-about-link onboarding-help-link" onClick={onShowHelp}>
           Ver la guía completa con imágenes
         </button>
-      </div>
-    </div>
+    </Modal>
   )
 }

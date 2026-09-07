@@ -9,7 +9,11 @@
     "preview": "vite preview",
     "thumbnails": "node scripts/generate-thumbnails.mjs",
     "help-shots": "node scripts/generate-help-shots.mjs",
-    "scale-config": "node scripts/generate-model-scale-config.mjs"
+    "scale-config": "node scripts/generate-model-scale-config.mjs",
+    "catalog": "node scripts/generate-catalog.mjs",
+    "predev": "npm run catalog",
+    "prebuild": "npm run catalog",
+    "test": "node --test tests/*.test.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^9.114.3",
@@ -21,6 +25,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
+    "esbuild": "^0.21.5",
     "playwright-core": "^1.62.1",
     "vite": "^5.4.11"
   }

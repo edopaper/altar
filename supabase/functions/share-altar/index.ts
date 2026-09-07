@@ -11,10 +11,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { containsForbiddenWord } from "../_shared/forbidden-words.ts";
 
+import { readJsonBody } from '../_shared/request-json.js';
+
 const RATE_LIMIT = 5; // altares nuevos por IP
 const UPDATE_RATE_LIMIT = 30; // actualizaciones (mismo altar) por IP, más laxo
 const WINDOW_MS = 60 * 60 * 1000; // 1 hora
-const MAX_OBJECTS = 150;
+import { isValidScene, cleanObject, isColor } from '../_shared/scene-validation.js';
 const PHOTO_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 const SLUG_ATTEMPTS = 5;
 
@@ -43,8 +45,13 @@ function getClientIp(req: Request): string {
 function decodeDataUrl(dataUrl: string): { bytes: Uint8Array; contentType: string } | null {
   const match = /^data:([^;]+);base64,(.*)$/s.exec(dataUrl);
   if (!match) return null;
-  const bytes = Uint8Array.from(atob(match[2]), (c) => c.charCodeAt(0));
-  return { bytes, contentType: match[1] };
+  if (match[2].length > Math.ceil(PHOTO_MAX_BYTES / 3) * 4) return null;
+  try {
+    const bytes = Uint8Array.from(atob(match[2]), (c) => c.charCodeAt(0));
+    return { bytes, contentType: match[1] };
+  } catch {
+    return null;
+  }
 }
 
 // Detecta el formato real de la imagen a partir de sus primeros bytes
@@ -75,16 +82,24 @@ Deno.serve(async (req) => {
 
   let payload: Record<string, unknown>;
   try {
-    payload = await req.json();
-  } catch {
-    return json({ error: "JSON inválido" }, 400);
+    payload = await readJsonBody(req);
+  } catch (error) {
+    const status = error && typeof error === 'object' && 'status' in error && error.status === 413 ? 413 : 400;
+    return json({ error: status === 413 ? "El contenido supera el tamaño permitido." : "JSON inválido" }, status);
   }
 
   const { name, objects, clothColor, photo, slug: requestedSlug, editToken } = payload ?? {};
 
-  if (!Array.isArray(objects) || objects.length > MAX_OBJECTS) {
+  if (!isValidScene(objects)) {
     return json({ error: "El altar tiene datos inválidos." }, 400);
   }
+  if (name !== undefined && (typeof name !== "string" || name.length > 120)) {
+    return json({ error: "Nombre inválido (máximo 120 caracteres)." }, 400);
+  }
+  if (clothColor !== undefined && clothColor !== null && !isColor(clothColor)) {
+    return json({ error: "Color del mantel inválido." }, 400);
+  }
+  const cleanObjects = (objects as Record<string, unknown>[]).map(cleanObject);
   if (photo !== undefined && photo !== null && typeof photo !== "string") {
     return json({ error: "Foto inválida." }, 400);
   }
@@ -169,7 +184,7 @@ Deno.serve(async (req) => {
       .from("altars")
       .update({
         name: (name as string) || "Altar de muertos",
-        objects,
+        objects: cleanObjects,
         photo_url: photoUrl,
         cloth_color: (clothColor as string) ?? null,
       })
@@ -193,7 +208,7 @@ Deno.serve(async (req) => {
       p_window_seconds: WINDOW_MS / 1000,
       p_limit: RATE_LIMIT,
     })
-    .single();
+    .single<{ allowed: boolean; retry_after_seconds: number; remaining: number }>();
 
   if (slotError || !slot) {
     return json({ error: "No se pudo verificar el límite de uso." }, 500);
@@ -227,7 +242,7 @@ Deno.serve(async (req) => {
     const { error: insertError } = await supabase.from("altars").insert({
       slug,
       name: (name as string) || "Altar de muertos",
-      objects,
+      objects: cleanObjects,
       photo_url: photoUrl,
       cloth_color: (clothColor as string) ?? null,
       edit_token: newEditToken,

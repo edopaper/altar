@@ -1,16 +1,11 @@
+import { readLocal, writeLocal } from '../localStore.js'
 import { useEffect, useRef, useState } from 'react'
 
-// Descubre dinámicamente los .mp3 en /public/music/ (misma técnica que los
-// modelos: la clave del glob trae el prefijo /public, que se recorta).
-const globbed = import.meta.glob('/public/music/*.mp3', {
-  eager: true,
-  query: '?url',
-  import: 'default',
-})
+import { musicPaths } from '../../supabase/functions/_shared/catalog.js'
 
-const TRACKS = Object.keys(globbed)
+const TRACKS = musicPaths
   .map((key) => {
-    const path = key.replace(/^\/public/, '')
+    const path = key
     const name = key.split('/').pop().replace(/\.mp3$/, '').replace(/[-_]/g, ' ')
     return { path, name }
   })
@@ -30,12 +25,12 @@ export default function MusicPlayer() {
   // No se persiste si estaba sonando: los navegadores bloquean el
   // autoplay sin gesto del usuario, así que igual habría que tocar play.
   const [trackIndex, setTrackIndex] = useState(() => {
-    const savedPath = localStorage.getItem(TRACK_KEY)
+    const savedPath = readLocal(TRACK_KEY)
     const i = TRACKS.findIndex((t) => t.path === savedPath)
     return i >= 0 ? i : 0
   })
   const [volume, setVolume] = useState(() => {
-    const raw = localStorage.getItem(VOLUME_KEY)
+    const raw = readLocal(VOLUME_KEY)
     if (raw === null) return DEFAULT_VOLUME
     const saved = Number(raw)
     return Number.isFinite(saved) && saved >= 0 && saved <= 1 ? saved : DEFAULT_VOLUME
@@ -43,11 +38,11 @@ export default function MusicPlayer() {
 
   useEffect(() => {
     if (audioRef.current) audioRef.current.volume = volume
-    localStorage.setItem(VOLUME_KEY, String(volume))
+    writeLocal(VOLUME_KEY, String(volume))
   }, [volume])
 
   useEffect(() => {
-    if (TRACKS[trackIndex]) localStorage.setItem(TRACK_KEY, TRACKS[trackIndex].path)
+    if (TRACKS[trackIndex]) writeLocal(TRACK_KEY, TRACKS[trackIndex].path)
   }, [trackIndex])
 
   // Cuando cambia la pista (React ya actualizó el src), se relanza el play.

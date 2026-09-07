@@ -1,3 +1,4 @@
+import { useQuality } from '../QualityContext.jsx'
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
@@ -24,33 +25,53 @@ export function registerFlame(ref) {
  */
 export default function CandleLights() {
   const lightRefs = useRef([])
+  const { reducedMotion } = useQuality()
+  const previousPositions = useRef(new WeakMap())
+  const previousCount = useRef(-1)
+  const cachedClusters = useRef([])
   const seeds = useMemo(() => Array.from({ length: MAX_LIGHTS }, () => Math.random() * 100), [])
   const worldPos = useMemo(() => new THREE.Vector3(), [])
 
   useFrame(({ clock }) => {
     // Agrupamiento greedy: cada flama entra al primer grupo a menos de
     // CLUSTER_RADIUS de su centroide; si no hay, abre grupo nuevo (con tope).
-    const clusters = [] // { sum: Vector3, count }
+    let changed = previousCount.current !== flames.size
+    previousCount.current = flames.size
     for (const ref of flames) {
-      const group = ref.current
-      if (!group) continue
-      group.getWorldPosition(worldPos)
-      let target = null
-      let bestDist = Infinity
-      for (const c of clusters) {
-        const d = worldPos.distanceTo(c.centroid)
-        if (d < bestDist) {
-          bestDist = d
-          target = c
+      if (!ref.current) continue
+      ref.current.getWorldPosition(worldPos)
+      const previous = previousPositions.current.get(ref)
+      if (!previous || !previous.equals(worldPos)) {
+        changed = true
+        if (previous) previous.copy(worldPos)
+        else previousPositions.current.set(ref, worldPos.clone())
+      }
+    }
+    const clusters = changed ? [] : cachedClusters.current
+    if (changed) {
+      for (const ref of flames) {
+        const group = ref.current
+        if (!group) continue
+        group.getWorldPosition(worldPos)
+        let target = null
+        let bestDist = Infinity
+        for (const c of clusters) {
+          const d = worldPos.distanceTo(c.centroid)
+          if (d < bestDist) {
+            bestDist = d
+            target = c
+          }
+        }
+        if (!target || (bestDist > CLUSTER_RADIUS && clusters.length < MAX_LIGHTS)) {
+          clusters.push({ centroid: worldPos.clone(), sum: worldPos.clone(), count: 1 })
+        } else {
+          target.sum.add(worldPos)
+          target.count += 1
+          target.centroid.copy(target.sum).multiplyScalar(1 / target.count)
         }
       }
-      if (!target || (bestDist > CLUSTER_RADIUS && clusters.length < MAX_LIGHTS)) {
-        clusters.push({ centroid: worldPos.clone(), sum: worldPos.clone(), count: 1 })
-      } else {
-        target.sum.add(worldPos)
-        target.count += 1
-        target.centroid.copy(target.sum).multiplyScalar(1 / target.count)
-      }
+
+      cachedClusters.current = clusters
     }
 
     for (let i = 0; i < MAX_LIGHTS; i++) {
@@ -64,7 +85,7 @@ export default function CandleLights() {
       const t = clock.elapsedTime + seeds[i]
       const noise =
         Math.sin(t * 11.3) * 0.35 + Math.sin(t * 17.7 + 1.3) * 0.25 + Math.sin(t * 28.9 + 4.1) * 0.4
-      const flicker = 0.8 + 0.2 * noise
+      const flicker = reducedMotion ? 0.8 : 0.8 + 0.2 * noise
       light.position.copy(cluster.centroid)
       // Más velas: más luz y más alcance, con crecimiento amortiguado
       light.intensity = 0.85 * Math.sqrt(cluster.count) * flicker

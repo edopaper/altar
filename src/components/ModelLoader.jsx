@@ -14,6 +14,14 @@ const TEXTURE_SLOTS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMa
 // traverse + `needsUpdate = true` se repetiría por cada instancia, re-subiendo
 // a la GPU las mismas texturas ya procesadas. Se marca por referencia de scene.
 const smoothedScenes = new WeakSet()
+const sceneBounds = new WeakMap()
+function getSceneBounds(scene) {
+  if (!sceneBounds.has(scene)) {
+    const box = new THREE.Box3().setFromObject(scene)
+    sceneBounds.set(scene, { minY: box.min.y, size: box.getSize(new THREE.Vector3()) })
+  }
+  return sceneBounds.get(scene)
+}
 function smoothTextures(root, maxAnisotropy) {
   if (smoothedScenes.has(root)) return
   smoothedScenes.add(root)
@@ -28,7 +36,7 @@ function smoothTextures(root, maxAnisotropy) {
         tex.magFilter = THREE.LinearFilter
         tex.minFilter = THREE.LinearMipmapLinearFilter
         tex.generateMipmaps = true
-        tex.anisotropy = maxAnisotropy
+        tex.anisotropy = Math.min(maxAnisotropy, 4)
         tex.needsUpdate = true
       }
     }
@@ -83,13 +91,12 @@ export default function ModelLoader({ path }) {
   useMemo(() => smoothTextures(scene, gl.capabilities.getMaxAnisotropy()), [scene, gl])
 
   const { factor, offsetY, topY } = useMemo(() => {
-    const box = new THREE.Box3().setFromObject(scene)
-    const size = box.getSize(new THREE.Vector3())
+    const { minY, size } = getSceneBounds(scene)
     const maxDim = Math.max(size.x, size.y, size.z) || 1
     const configuredScale = getConfiguredScale(path, scaleConfig)
     const f = (TARGET_SIZE / maxDim) * configuredScale
     // Apoya el modelo sobre su base (y=0 local) en lugar de su origen arbitrario.
-    return { factor: f, offsetY: -box.min.y * f, topY: size.y * f }
+    return { factor: f, offsetY: -minY * f, topY: size.y * f }
   }, [scene, path, scaleConfig])
 
   // Los modelos de la carpeta de velas llevan flama parpadeante en la punta.
