@@ -1,9 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { POST_LOGIN_REDIRECT_KEY, rememberLoginRoute } from '../auth.js'
 import { supabase } from '../supabaseClient.js'
 
 const ALTARS_PAGE_SIZE = 20
+const ALL_ALTARS_PAGE_SIZE = 50
 const MESSAGES_PAGE_SIZE = 20
+const DEFAULT_CIET_INTERVAL = 30
+const MIN_CIET_INTERVAL = 5
 
 function formatDate(iso) {
   try {
@@ -28,6 +31,9 @@ export default function AdminDashboard() {
   const [altars, setAltars] = useState([])
   const [altarsHasMore, setAltarsHasMore] = useState(false)
   const [altarsLoadingMore, setAltarsLoadingMore] = useState(false)
+  const [allAltars, setAllAltars] = useState([])
+  const [allAltarsHasMore, setAllAltarsHasMore] = useState(false)
+  const [allAltarsLoadingMore, setAllAltarsLoadingMore] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [busySlug, setBusySlug] = useState(null)
   const [expandedSlug, setExpandedSlug] = useState(null)
@@ -35,6 +41,14 @@ export default function AdminDashboard() {
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [messagesLoadingMore, setMessagesLoadingMore] = useState(false)
   const [busyMessageId, setBusyMessageId] = useState(null)
+  const [cietSelectedSlugs, setCietSelectedSlugs] = useState([])
+  const [cietCount, setCietCount] = useState(0)
+  const [cietInterval, setCietInterval] = useState(DEFAULT_CIET_INTERVAL)
+  const [cietSaving, setCietSaving] = useState(false)
+  const [cietMessage, setCietMessage] = useState('')
+  const [cietError, setCietError] = useState('')
+
+  const cietSelectedSet = useMemo(() => new Set(cietSelectedSlugs), [cietSelectedSlugs])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
@@ -82,8 +96,54 @@ export default function AdminDashboard() {
       })
   }
 
+  const loadAllAltars = (reset = true) => {
+    const from = reset ? 0 : allAltars.length
+    const to = from + ALL_ALTARS_PAGE_SIZE - 1
+    if (!reset) setAllAltarsLoadingMore(true)
+
+    supabase
+      .from('altars')
+      .select('slug, name, status, reported_count, created_at')
+      .order('created_at', { ascending: false })
+      .range(from, to)
+      .then(({ data, error }) => {
+        if (!reset) setAllAltarsLoadingMore(false)
+        if (error) {
+          setLoadError('No se pudo cargar la lista completa de altares.')
+          return
+        }
+        const rows = data ?? []
+        setAllAltars((prev) => (reset ? rows : [...prev, ...rows]))
+        setAllAltarsHasMore(rows.length === ALL_ALTARS_PAGE_SIZE)
+      })
+  }
+
+  const loadCietConfig = () => {
+    setCietError('')
+    supabase
+      .from('ciet_config')
+      .select('selected_slugs, rotation_seconds')
+      .eq('id', 'default')
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) {
+          setCietError('No se pudo cargar CIET. Revisa que la migración 018 esté aplicada.')
+          return
+        }
+        const selected = Array.isArray(data?.selected_slugs) ? data.selected_slugs.filter(Boolean) : []
+        const interval = Number(data?.rotation_seconds) || DEFAULT_CIET_INTERVAL
+        setCietSelectedSlugs(selected)
+        setCietCount(selected.length)
+        setCietInterval(Math.max(MIN_CIET_INTERVAL, interval))
+      })
+  }
+
   useEffect(() => {
-    if (isAdmin) loadAltars()
+    if (isAdmin) {
+      loadAltars()
+      loadAllAltars()
+      loadCietConfig()
+    }
   }, [isAdmin])
 
   const handleLogin = async () => {
@@ -107,6 +167,44 @@ export default function AdminDashboard() {
       return
     }
     setAltars((prev) => prev.map((a) => (a.slug === slug ? { ...a, status } : a)))
+    setAllAltars((prev) => prev.map((a) => (a.slug === slug ? { ...a, status } : a)))
+  }
+
+  const handleCietCountChange = (event) => {
+    const next = Math.max(0, Number(event.target.value) || 0)
+    setCietCount(next)
+    setCietSelectedSlugs((prev) => prev.slice(0, next))
+  }
+
+  const toggleCietAltar = (slug) => {
+    setCietMessage('')
+    setCietError('')
+    setCietSelectedSlugs((prev) => {
+      if (prev.includes(slug)) return prev.filter((item) => item !== slug)
+      if (cietCount <= 0) return prev
+      if (cietCount > 0 && prev.length >= cietCount) return prev
+      return [...prev, slug]
+    })
+  }
+
+  const saveCietConfig = async () => {
+    setCietSaving(true)
+    setCietMessage('')
+    setCietError('')
+    const selected = cietSelectedSlugs.slice(0, cietCount || cietSelectedSlugs.length)
+    const rotationSeconds = Math.max(MIN_CIET_INTERVAL, Number(cietInterval) || DEFAULT_CIET_INTERVAL)
+    const { error } = await supabase
+      .from('ciet_config')
+      .upsert({ id: 'default', selected_slugs: selected, rotation_seconds: rotationSeconds })
+    setCietSaving(false)
+    if (error) {
+      setCietError('No se pudo guardar la configuración de CIET.')
+      return
+    }
+    setCietSelectedSlugs(selected)
+    setCietCount(selected.length)
+    setCietInterval(rotationSeconds)
+    setCietMessage('Configuración de CIET guardada.')
   }
 
   const loadMessages = (slug, reset = true) => {
@@ -222,6 +320,9 @@ export default function AdminDashboard() {
           <button className="btn" onClick={() => loadAltars(true)}>
             Refrescar
           </button>
+          <a className="btn" href="#/ciet" target="_blank" rel="noreferrer">
+            Abrir CIET
+          </a>
           <button className="btn" onClick={handleLogout}>
             Salir
           </button>
@@ -230,12 +331,110 @@ export default function AdminDashboard() {
 
       {loadError && <div className="admin-error">{loadError}</div>}
 
-      {altars.length === 0 && !loadError && (
-        <p className="admin-empty">No hay altares reportados u ocultos. Todo tranquilo 🕯️</p>
-      )}
+      <section className="admin-section">
+        <div className="admin-section-header">
+          <div>
+            <h2>CIET</h2>
+            <p>Elegí cuántos altares se rotan y cada cuánto cambia la pantalla.</p>
+          </div>
+          <button className="btn btn--active" disabled={cietSaving} onClick={saveCietConfig}>
+            {cietSaving ? 'Guardando…' : 'Guardar CIET'}
+          </button>
+        </div>
+        <div className="admin-ciet-controls">
+          <label className="admin-field">
+            <span>Cantidad de altares</span>
+            <input min="0" type="number" value={cietCount} onChange={handleCietCountChange} />
+          </label>
+          <label className="admin-field">
+            <span>Tiempo por altar (segundos)</span>
+            <input
+              min={MIN_CIET_INTERVAL}
+              type="number"
+              value={cietInterval}
+              onChange={(event) => setCietInterval(event.target.value)}
+            />
+          </label>
+          <span className="admin-card-meta">
+            Seleccionados: {cietSelectedSlugs.length}{cietCount ? ` / ${cietCount}` : ''}
+          </span>
+        </div>
+        {cietError && <div className="admin-error">{cietError}</div>}
+        {cietMessage && <div className="admin-success">{cietMessage}</div>}
+      </section>
 
-      <div className="admin-list">
-        {altars.map((altar) => {
+      <section className="admin-section">
+        <div className="admin-section-header">
+          <div>
+            <h2>Altares</h2>
+            <p>Lista de altares con nombre y liga pública. Marcá cuáles entran a CIET.</p>
+          </div>
+          <button className="btn" onClick={() => loadAllAltars(true)}>
+            Refrescar altares
+          </button>
+        </div>
+        <div className="admin-list">
+          {allAltars.map((altar) => {
+            const shareHash = `#/ver/${altar.slug}`
+            const shareUrl = `${window.location.origin}${window.location.pathname}${shareHash}`
+            const checked = cietSelectedSet.has(altar.slug)
+            const selectionFull = cietCount <= 0 || (cietSelectedSlugs.length >= cietCount && !checked)
+
+            return (
+              <div key={altar.slug} className="admin-card">
+                <div className="admin-card-row">
+                  <label className="admin-check">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={selectionFull}
+                      onChange={() => toggleCietAltar(altar.slug)}
+                    />
+                    <span className="admin-card-name">{altar.name || altar.slug}</span>
+                  </label>
+                  <div className="admin-card-main">
+                    <span
+                      className={`admin-badge ${altar.status === 'hidden' ? 'admin-badge--hidden' : 'admin-badge--visible'}`}
+                    >
+                      {altar.status === 'hidden' ? 'Oculto' : 'Visible'}
+                    </span>
+                    <span className="admin-card-meta">{formatDate(altar.created_at)}</span>
+                  </div>
+                  <div className="admin-card-actions">
+                    <a className="admin-link" href={shareHash} target="_blank" rel="noreferrer">
+                      {shareUrl}
+                    </a>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        {allAltarsHasMore && (
+          <button
+            className="btn admin-load-more"
+            disabled={allAltarsLoadingMore}
+            onClick={() => loadAllAltars(false)}
+          >
+            {allAltarsLoadingMore ? 'Cargando…' : 'Cargar más altares'}
+          </button>
+        )}
+      </section>
+
+      <section className="admin-section">
+        <div className="admin-section-header">
+          <div>
+            <h2>Moderación</h2>
+            <p>Altares reportados u ocultos.</p>
+          </div>
+        </div>
+
+        {altars.length === 0 && !loadError && (
+          <p className="admin-empty">No hay altares reportados u ocultos.</p>
+        )}
+
+        <div className="admin-list">
+          {altars.map((altar) => {
           const messageCount = altar.messages?.[0]?.count ?? 0
           const expanded = expandedSlug === altar.slug
           const messageState = messagesBySlug[altar.slug]
@@ -350,18 +549,19 @@ export default function AdminDashboard() {
               )}
             </div>
           )
-        })}
-      </div>
+          })}
+        </div>
 
-      {altarsHasMore && (
-        <button
-          className="btn admin-load-more"
-          disabled={altarsLoadingMore}
-          onClick={() => loadAltars(false)}
-        >
-          {altarsLoadingMore ? 'Cargando…' : 'Cargar más altares'}
-        </button>
-      )}
+        {altarsHasMore && (
+          <button
+            className="btn admin-load-more"
+            disabled={altarsLoadingMore}
+            onClick={() => loadAltars(false)}
+          >
+            {altarsLoadingMore ? 'Cargando…' : 'Cargar más altares'}
+          </button>
+        )}
+      </section>
     </div>
   )
 }

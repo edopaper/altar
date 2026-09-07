@@ -872,6 +872,98 @@ canvas {
   padding: 10px 18px;
 }
 
+/* ---------- CIET ---------- */
+.ciet-ui {
+  opacity: 1;
+  transition: opacity 0.8s ease;
+}
+
+.ciet-ui--hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ciet-music .music-player {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+}
+
+.ciet-overlay {
+  position: absolute;
+  left: 24px;
+  bottom: 24px;
+  display: flex;
+  align-items: end;
+  gap: 18px;
+  max-width: calc(100% - 300px);
+  color: #e8e3f0;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+
+.ciet-kicker {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffb347;
+  letter-spacing: 0.08em;
+}
+
+.ciet-overlay h1 {
+  max-width: 520px;
+  margin: 2px 0 0;
+  font-size: 28px;
+  line-height: 1.05;
+  color: #fff6df;
+}
+
+.ciet-meta {
+  margin-bottom: 3px;
+  font-size: 12px;
+  color: #d8c7aa;
+  white-space: nowrap;
+}
+
+.ciet-admin-bar {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  display: flex;
+  gap: 8px;
+}
+
+.ciet-admin-bar .btn {
+  flex: none;
+  text-decoration: none;
+}
+
+@media (max-width: 760px) {
+  .admin-section-header {
+    flex-direction: column;
+  }
+
+  .ciet-overlay {
+    left: 14px;
+    right: 14px;
+    bottom: 86px;
+    max-width: none;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .ciet-overlay h1 {
+    font-size: 22px;
+  }
+
+  .ciet-music .music-player {
+    left: 14px;
+    right: 14px;
+    bottom: 14px;
+  }
+}
+
 /* ---------- Formulario de mensajes (visor) ---------- */
 .message-overlay {
   position: absolute;
@@ -1367,6 +1459,53 @@ canvas {
   flex: none;
 }
 
+.admin-section {
+  margin: 18px 0 24px;
+}
+
+.admin-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.admin-section h2 {
+  font-size: 16px;
+  color: #ffb347;
+  margin: 0 0 4px;
+}
+
+.admin-section p {
+  margin: 0;
+}
+
+.admin-ciet-controls {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.admin-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 11.5px;
+  color: #9a90b8;
+}
+
+.admin-field input {
+  width: 150px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 170, 85, 0.25);
+  border-radius: 8px;
+  background: rgba(15, 12, 26, 0.9);
+  color: #e8e3f0;
+}
+
 .admin-load-more {
   display: block;
   width: 100%;
@@ -1376,6 +1515,12 @@ canvas {
 .admin-error {
   font-size: 12.5px;
   color: #ff8a8a;
+  margin-bottom: 12px;
+}
+
+.admin-success {
+  font-size: 12.5px;
+  color: #8fd9a4;
   margin-bottom: 12px;
 }
 
@@ -1434,6 +1579,31 @@ canvas {
 .admin-message-actions .btn {
   flex: none;
   text-decoration: none;
+}
+
+.admin-check {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 180px;
+}
+
+.admin-check input {
+  accent-color: #ffb347;
+}
+
+.admin-link {
+  max-width: min(360px, 72vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #ffcf91;
+  font-size: 11.5px;
+  text-decoration: none;
+}
+
+.admin-link:hover {
+  text-decoration: underline;
 }
 
 .admin-badge {
