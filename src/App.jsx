@@ -1,10 +1,10 @@
 import { lazy, useEffect, useState } from 'react'
 import { supabase } from './supabaseClient.js'
+import { POST_LOGIN_REDIRECT_KEY, USER_LOGIN_REDIRECT_KEY } from './auth.js'
 const AltarEditor = lazy(() => import('./AltarEditor.jsx'))
 const AltarViewer = lazy(() => import('./components/AltarViewer.jsx'))
 const ThumbnailStage = lazy(() => import('./components/ThumbnailStage.jsx'))
 const AdminDashboard = lazy(() => import('./components/AdminDashboard.jsx'))
-const POST_LOGIN_REDIRECT_KEY = 'altar-admin-redirect'
 
 // Rutas por hash, sin dependencias: "#/" editor, "#/ver/<slug>" visor.
 function useHashRoute() {
@@ -27,9 +27,13 @@ export default function App() {
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event !== 'SIGNED_IN') return
       const redirect = sessionStorage.getItem(POST_LOGIN_REDIRECT_KEY)
+      const userRedirect = sessionStorage.getItem(USER_LOGIN_REDIRECT_KEY)
       if (redirect) {
         sessionStorage.removeItem(POST_LOGIN_REDIRECT_KEY)
         window.location.hash = redirect
+      } else if (userRedirect) {
+        sessionStorage.removeItem(USER_LOGIN_REDIRECT_KEY)
+        window.location.hash = userRedirect
       }
     })
     return () => sub.subscription.unsubscribe()

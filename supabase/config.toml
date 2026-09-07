@@ -2,7 +2,7 @@ project_id = "gqtigeuoazvedlphprzk"
 
 [auth]
 site_url = "http://localhost:3000"
-additional_redirect_urls = []
+additional_redirect_urls = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
 [auth.email]
 enable_confirmations = true
@@ -18,3 +18,7 @@ enabled = true
 client_id = "env(SUPABASE_AUTH_EXTERNAL_GITHUB_CLIENT_ID)"
 secret = "env(SUPABASE_AUTH_EXTERNAL_GITHUB_SECRET)"
 
+[auth.external.google]
+enabled = true
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"

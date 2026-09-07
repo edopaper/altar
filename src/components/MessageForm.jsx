@@ -1,6 +1,8 @@
 import Modal from './Modal.jsx'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { getUserDisplayName } from '../auth.js'
 import { MAX_MESSAGE_LENGTH, MAX_NAME_LENGTH, saveMessage } from '../messages.js'
+import { supabase } from '../supabaseClient.js'
 
 /** Overlay para dejar un mensaje corto ligado al altar compartido. */
 export default function MessageForm({ slug, onClose, onSaved }) {
@@ -8,6 +10,17 @@ export default function MessageForm({ slug, onClose, onSaved }) {
   const [author, setAuthor] = useState('')
   const [error, setError] = useState('')
   const [sending, setSending] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    supabase.auth.getSession().then(({ data }) => {
+      if (cancelled || !data.session) return
+      setAuthor((current) => current || getUserDisplayName(data.session.user).slice(0, MAX_NAME_LENGTH))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const submit = async () => {
     if (sending) return

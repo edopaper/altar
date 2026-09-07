@@ -28,7 +28,7 @@ const STEPS = [
         <path d="M18 15v4h-4" />
       </Icon>
     ),
-    text: 'Arrastrá para girar la cámara y usá la rueda para acercar o alejar.',
+    text: 'Arrastra para explorar tu altar. Usa la rueda o dos dedos para acercarte.',
   },
   {
     icon: (
@@ -37,7 +37,7 @@ const STEPS = [
         <path d="M12 8v8M8 12h8" />
       </Icon>
     ),
-    text: 'Tocá una miniatura de "Decoración" (en el menú) para sumarla al altar.',
+    text: 'Elige flores, velas y ofrendas del catálogo de decoración.',
   },
   {
     icon: (
@@ -46,7 +46,7 @@ const STEPS = [
         <path d="m5 5 3.5 3.5M19 5l-3.5 3.5M5 19l3.5-3.5M19 19l-3.5-3.5" />
       </Icon>
     ),
-    text: 'Seleccionalo con click y movelo, rotalo o escalalo con la barra de arriba (o G/R/S).',
+    text: 'Selecciona una pieza para moverla, girarla o cambiar su tamaño.',
   },
   {
     icon: (
@@ -66,14 +66,17 @@ const STEPS = [
         <path d="M8.6 10.5 15.4 6.5M8.6 13.5 15.4 17.5" />
       </Icon>
     ),
-    text: 'Cuando esté listo, compartilo con el botón de la esquina del visor.',
+    text: 'Comparte tu altar para que otros también puedan recordarlos.',
   },
 ]
 
 export default function Onboarding({ onClose, onShowHelp }) {
   return (
     <Modal onClose={onClose} label="Bienvenido a tu altar" className="message-form onboarding-form">
-        <h2>Bienvenido a tu altar</h2>
+        <div className="onboarding-emblem" aria-hidden="true">✺</div>
+        <p className="menu-eyebrow">Una tradición que nos une</p>
+        <h2>Los recuerdos<br />también florecen.</h2>
+        <p className="onboarding-intro">Crea una ofrenda para quienes siempre llevas contigo.</p>
         <ul className="onboarding-steps">
           {STEPS.map((step, i) => (
             <li key={i}>
@@ -84,7 +87,7 @@ export default function Onboarding({ onClose, onShowHelp }) {
         </ul>
         <div className="shape-row message-actions">
           <button className="btn btn--block btn--primary" onClick={onClose}>
-            Entendido, ¡vamos!
+            Crear mi altar
           </button>
         </div>
         <button className="menu-about-link onboarding-help-link" onClick={onShowHelp}>

@@ -8,6 +8,7 @@ import { QualityControls } from '../QualityContext.jsx'
 import { supabase } from '../supabaseClient.js'
 import MessageForm from './MessageForm.jsx'
 import MessageList from './MessageList.jsx'
+import UserAccount from './UserAccount.jsx'
 
 const noop = () => {}
 const IDLE_DELAY_MS = 4000
@@ -184,6 +185,7 @@ export default function AltarViewer({ slug }) {
       </Canvas>
 
       <div className={`viewer-ui ${idle ? 'viewer-ui--hidden' : ''}`}>
+        <UserAccount compact />
         <div className="viewer-bar">
           <span className="viewer-title">{data.name}</span>
           <button className="btn" onClick={() => setShowMessageForm(true)}>

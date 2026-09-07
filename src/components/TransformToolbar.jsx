@@ -52,6 +52,7 @@ export default function TransformToolbar({
             <button
               key={m.id}
               className={`toolbar-btn ${mode === m.id ? 'toolbar-btn--active' : ''}`}
+              aria-pressed={mode === m.id}
               onClick={() => onModeChange(m.id)}
               disabled={disabled}
               title={disabled ? 'No disponible con varios objetos seleccionados' : `Atajo: ${m.key}`}

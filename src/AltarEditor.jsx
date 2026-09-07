@@ -8,6 +8,7 @@ import AltarScene from './components/AltarScene.jsx'
 import AltarMenu from './components/AltarMenu.jsx'
 import TransformToolbar from './components/TransformToolbar.jsx'
 import MusicPlayer from './components/MusicPlayer.jsx'
+import UserAccount from './components/UserAccount.jsx'
 const AboutPanel = lazy(() => import('./components/AboutPanel.jsx'))
 const HelpPanel = lazy(() => import('./components/HelpPanel.jsx'))
 const Onboarding = lazy(() => import('./components/Onboarding.jsx'))
@@ -550,6 +551,7 @@ export default function AltarEditor() {
   return (
     <div className={`app ${menuOpen ? 'app--menu-open' : ''}`}>
       {!menuOpen && <QualityControls floating />}
+      <UserAccount />
       {!menuOpen && <div className="draft-status" role="status">
         {draft.status === 'saving' ? 'Guardando…' : draft.status === 'saved' ? 'Guardado en este navegador' : 'No se pudo guardar en este navegador'}
         {draft.status === 'error' && <button className="btn" onClick={draft.retry}>Reintentar</button>}

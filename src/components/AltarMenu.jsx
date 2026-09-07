@@ -137,7 +137,13 @@ export default function AltarMenu({
   return (
     <aside className="menu">
       <div className="menu-header">
-        <h1 className="menu-title">Altar de Muertos</h1>
+        <div className="menu-brand">
+          <span className="brand-flower" aria-hidden="true">✺</span>
+          <div>
+            <p className="menu-eyebrow">Día de Muertos</p>
+            <h1 className="menu-title">Mi altar</h1>
+          </div>
+        </div>
         <button className="menu-hide-btn" onClick={onHide} title="Ocultar menú" aria-label="Ocultar menú">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="18" y1="6" x2="6" y2="18" />
@@ -147,6 +153,7 @@ export default function AltarMenu({
       </div>
 
       <div className="menu-body">
+      <p className="menu-intro">Un lugar para recordar y celebrar la vida.</p>
       <section className="menu-section">
         <h2>
           Objetos en escena ({objects.length}/{maxObjects})
@@ -170,7 +177,7 @@ export default function AltarMenu({
             style={{ width: `${Math.min(100, (objects.length / maxObjects) * 100)}%` }}
           />
         </div>
-        {objects.length === 0 && <div className="menu-empty">Aún no hay objetos</div>}
+        {objects.length === 0 && <div className="menu-empty">Tu ofrenda empieza aquí. Elige una decoración para darle vida.</div>}
         {objects.length >= maxObjects ? (
           <div className="menu-note menu-note--danger">
             Llegaste al máximo de {maxObjects} objetos. Elimina alguno para agregar otro.
@@ -280,7 +287,8 @@ export default function AltarMenu({
         <input
           type="search"
           className="decor-search"
-          placeholder="Buscar (ej. catrina, vela, calabaza)…"
+          placeholder="Buscar flores, velas, calaveras…"
+          aria-label="Buscar decoración"
           value={decorQuery}
           onChange={(e) => setDecorQuery(e.target.value)}
         />
@@ -340,7 +348,7 @@ export default function AltarMenu({
             <input
               type="file"
               accept="image/*"
-              hidden
+              className="photo-upload-input"
               onChange={(e) => {
                 onUploadPhoto(e.target.files?.[0])
                 e.target.value = '' // permite volver a elegir el mismo archivo
@@ -353,7 +361,7 @@ export default function AltarMenu({
             </button>
           )}
         </div>
-        <div className="menu-note">Máx. 5 MB · se ajusta a 512 px conservando proporción</div>
+        <div className="menu-note">Un rostro para recordar. Sube una foto de hasta 5 MB.</div>
       </section>
 
       <section className="menu-section">
@@ -367,7 +375,7 @@ export default function AltarMenu({
       <section className="menu-section">
         <label className="snap-row">
           <input type="checkbox" checked={snap} onChange={onToggleSnap} />
-          Snap a rejilla (0.1 u / 15°)
+          Ajustar a la rejilla
         </label>
         <button className="btn btn--danger btn--block" onClick={onClearAltar} disabled={objects.length === 0}>
           Limpiar altar

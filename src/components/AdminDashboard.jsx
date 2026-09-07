@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
+import { POST_LOGIN_REDIRECT_KEY } from '../auth.js'
 import { supabase } from '../supabaseClient.js'
 
-const POST_LOGIN_REDIRECT_KEY = 'altar-admin-redirect'
 const ALTARS_PAGE_SIZE = 20
 const MESSAGES_PAGE_SIZE = 20
 
@@ -365,5 +365,3 @@ export default function AdminDashboard() {
     </div>
   )
 }
-
-export { POST_LOGIN_REDIRECT_KEY }
