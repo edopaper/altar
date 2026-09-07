@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getUserAvatar, getUserDisplayName, USER_LOGIN_REDIRECT_KEY } from '../auth.js'
+import { getUserAvatar, getUserDisplayName, getLoginErrorMessage, rememberLoginRoute, USER_LOGIN_REDIRECT_KEY } from '../auth.js'
 import { supabase } from '../supabaseClient.js'
 
 export default function UserAccount({ compact = false }) {
@@ -9,8 +9,15 @@ export default function UserAccount({ compact = false }) {
 
   useEffect(() => {
     let cancelled = false
-    supabase.auth.getSession().then(({ data }) => {
-      if (!cancelled) setSession(data.session)
+    supabase.auth.getSession().then(({ data, error: sessionError }) => {
+      if (cancelled) return
+      setSession(data.session)
+      if (sessionError) setError('Tu sesión no está disponible. Vuelve a iniciar sesión.')
+    }).catch(() => {
+      if (!cancelled) {
+        setSession(null)
+        setError('No se pudo recuperar tu sesión. Inténtalo de nuevo.')
+      }
     })
     const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession)
@@ -25,23 +32,30 @@ export default function UserAccount({ compact = false }) {
   const login = async () => {
     setBusy(true)
     setError('')
-    sessionStorage.setItem(USER_LOGIN_REDIRECT_KEY, window.location.hash || '#/')
-    const { error: loginError } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: `${window.location.origin}${window.location.pathname}` },
-    })
-    if (loginError) {
+    rememberLoginRoute(USER_LOGIN_REDIRECT_KEY, window.location.hash || '#/')
+    try {
+      const { error: loginError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: `${window.location.origin}${window.location.pathname}` },
+      })
+      if (loginError) throw loginError
+    } catch (loginError) {
       setBusy(false)
-      setError('No se pudo iniciar sesión con Google.')
+      setError(getLoginErrorMessage(loginError))
     }
   }
 
   const logout = async () => {
     setBusy(true)
     setError('')
-    const { error: logoutError } = await supabase.auth.signOut()
-    setBusy(false)
-    if (logoutError) setError('No se pudo cerrar sesión.')
+    try {
+      const { error: logoutError } = await supabase.auth.signOut()
+      if (logoutError) throw logoutError
+    } catch {
+      setError('No se pudo cerrar sesión. Inténtalo de nuevo.')
+    } finally {
+      setBusy(false)
+    }
   }
 
   if (session === undefined) {
@@ -55,7 +69,7 @@ export default function UserAccount({ compact = false }) {
           <span className="account-google-mark" aria-hidden="true">G</span>
           {busy ? 'Abriendo…' : 'Entrar con Google'}
         </button>
-        {error && <div className="account-error">{error}</div>}
+        {error && <div className="account-error" role="alert">{error}</div>}
       </div>
     )
   }
@@ -76,7 +90,7 @@ export default function UserAccount({ compact = false }) {
       <button className="account-signout" onClick={logout} disabled={busy}>
         Salir
       </button>
-      {error && <div className="account-error">{error}</div>}
+      {error && <div className="account-error" role="alert">{error}</div>}
     </div>
   )
 }

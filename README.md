@@ -38,3 +38,29 @@ Los cambios del repositorio no se publican automáticamente:
 La validación estricta rechaza escenas inválidas o modelos que ya no estén en el catálogo. Los borradores locales recuperan los objetos válidos; un altar compartido incompatible muestra un error de carga.
 
 El build local pasó de aproximadamente 63 MB a 33 MB al eliminar copias redundantes de archivos públicos. Esta reducción corresponde al despliegue, no a una medición del tráfico inicial ni de FPS en dispositivos físicos.
+
+## Login con Google (Supabase Auth)
+
+El frontend ya incluye login, recuperación de sesión, nombre/avatar y cierre de sesión. El editor y el visor permiten entrar con Google; el panel de administración usa GitHub y conserva sus comprobaciones de permisos.
+
+### Configuración del proyecto alojado
+
+1. En Google Cloud / Google Auth Platform configura la pantalla de consentimiento y crea un cliente OAuth de tipo **Aplicación web**. Si la aplicación está en modo de pruebas, añade las cuentas de prueba en Audience.
+2. En **URIs de redireccionamiento autorizados** del cliente Google añade el callback que muestra Supabase en el proveedor Google. Para el proyecto referenciado en `supabase/config.toml` es `https://gqtigeuoazvedlphprzk.supabase.co/auth/v1/callback`. Verifica que sea el mismo proyecto usado por `VITE_SUPABASE_URL`.
+3. En Supabase → Authentication → Sign In / Providers → Google habilita el proveedor y guarda el **Client ID** y **Client Secret** de Google. El secreto se configura allí, nunca en una variable `VITE_*`.
+4. En Supabase → Authentication → URL Configuration configura **Site URL** con la URL principal de producción (o `http://localhost:5173` durante desarrollo). Añade a **Redirect URLs** las direcciones de la app desde las que haces login, con la ruta y puerto exactos: `http://localhost:5173/` y `http://127.0.0.1:5173/`. Si Vite inicia en otro puerto, como 5175, añade también `http://localhost:5175/` y/o `http://127.0.0.1:5175/`. Añade por separado tu URL de producción. No incluyas `#/` ni `#/ver/...`: la app recupera esa ruta después del login.
+5. Configura `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` en `.env` y en el proveedor de hosting; recompila al cambiar estas variables. La segunda es la clave pública anon del proyecto, nunca la service_role.
+
+El archivo `supabase/config.toml` configura el entorno local de Supabase CLI; editarlo no habilita Google automáticamente en el proyecto alojado. Para Supabase local, define las variables `SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID` y `SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET`, y registra también el callback local que indique la CLI.
+
+### Comprobación
+
+Pulsa «Entrar con Google», elige una cuenta y verifica que vuelvas al mismo altar, que aparezca tu nombre/avatar, que la sesión se mantenga al recargar y que «Salir» cierre la sesión. Comprueba el usuario en Authentication → Users. Repite en producción.
+
+- `provider is not enabled`: activa Google en el proyecto Supabase que usa la app.
+- `redirect_uri_mismatch`: revisa el callback de **Supabase** registrado en **Google**.
+- Retorno a un dominio/puerto incorrecto: revisa las URLs de la **app** registradas en **Supabase**.
+
+Iniciar sesión identifica al visitante. El borrador sigue guardándose en este navegador; sincronizar altares entre dispositivos requiere asociarlos a `auth.uid()` y definir las políticas de acceso correspondientes.
+
+Referencias: [Google en Supabase](https://supabase.com/docs/guides/auth/social-login/auth-google) y [URLs de retorno](https://supabase.com/docs/guides/auth/redirect-urls).

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { POST_LOGIN_REDIRECT_KEY } from '../auth.js'
+import { POST_LOGIN_REDIRECT_KEY, rememberLoginRoute } from '../auth.js'
 import { supabase } from '../supabaseClient.js'
 
 const ALTARS_PAGE_SIZE = 20
@@ -87,7 +87,7 @@ export default function AdminDashboard() {
   }, [isAdmin])
 
   const handleLogin = async () => {
-    sessionStorage.setItem(POST_LOGIN_REDIRECT_KEY, '#/admin')
+    rememberLoginRoute(POST_LOGIN_REDIRECT_KEY, '#/admin')
     await supabase.auth.signInWithOAuth({
       provider: 'github',
       options: { redirectTo: `${window.location.origin}${window.location.pathname}` },
