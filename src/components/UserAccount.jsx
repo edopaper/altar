@@ -86,6 +86,7 @@ export default function UserAccount({ compact = false }) {
           {name.charAt(0).toUpperCase()}
         </span>
       )}
+      <a className="account-signout" href="#/mis-altares">Mis altares</a>
       <span className="account-name" title={name}>{name}</span>
       <button className="account-signout" onClick={logout} disabled={busy}>
         Salir

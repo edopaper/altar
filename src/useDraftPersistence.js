@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { writeLocal } from './localStore.js'
 
-export default function useDraftPersistence(objects, photo, clothColor) {
+export default function useDraftPersistence(objects, photo, clothColor, prefix = '') {
   const [status, setStatus] = useState('saving')
   const pending = useRef(null)
   const timer = useRef(null)
@@ -9,9 +9,9 @@ export default function useDraftPersistence(objects, photo, clothColor) {
     if (!pending.current) return
     const draft = pending.current
     const results = [
-      writeLocal('altar-objects-v1', JSON.stringify(draft.objects)),
-      writeLocal('altar-photo-v1', draft.photo),
-      writeLocal('altar-cloth-color-v1', draft.clothColor),
+      writeLocal(prefix + 'altar-objects-v1', JSON.stringify(draft.objects)),
+      writeLocal(prefix + 'altar-photo-v1', prefix ? JSON.stringify(draft.photo) : draft.photo),
+      writeLocal(prefix + 'altar-cloth-color-v1', draft.clothColor),
     ]
     const ok = results.every(Boolean)
     if (ok) pending.current = null

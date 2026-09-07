@@ -125,3 +125,36 @@ input { accent-color: var(--ofrenda-gold); }
   .btn, .decor-chip, .object-item, .lock-btn, .menu-hide-btn, .menu-about-link { min-height: 44px; }
   .lock-btn, .menu-hide-btn { min-width: 44px; }
 }
+.my-altars { height: 100%; overflow-y: auto; padding: 80px max(24px, calc((100vw - 1080px) / 2)); background: radial-gradient(ellipse at top, #43293d, #17111e 70%); }
+.my-altars > .menu-eyebrow { margin-top: 32px; }
+.my-altars h1 { font: 48px Georgia, serif; margin: 12px 0; }
+.my-altars p { color: var(--ofrenda-muted); line-height: 1.6; }
+.my-altars-actions { display: flex; align-items: center; gap: 20px; margin: 30px 0; }
+.my-altars-actions .btn { flex: none; }
+.my-altars a.btn { text-decoration: none; text-align: center; }
+.my-altars-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.my-altar-card { padding: 18px; border: 1px solid var(--ofrenda-border); border-radius: 18px; background: var(--ofrenda-panel); }
+.my-altar-cover { height: 150px; display: grid; place-items: center; background: #f5b85c0b; border-radius: 12px; overflow: hidden; }
+.my-altar-cover img { width: 100%; height: 100%; object-fit: contain; }
+.my-altar-cover span { font-size: 70px; color: var(--ofrenda-gold); }
+.my-altar-card h2 { font: 26px Georgia, serif; margin: 18px 0 8px; overflow-wrap: anywhere; }
+.my-altar-card p { font-size: 12px; margin-bottom: 18px; }
+.altar-name-control { position: absolute; top: 18px; left: 380px; z-index: 2; width: 220px; }
+.altar-name-control label { display: block; color: var(--ofrenda-muted); font-size: 10px; margin-bottom: 4px; }
+.altar-name-control input { width: 100%; background: var(--ofrenda-panel); color: var(--ofrenda-text); border: 1px solid var(--ofrenda-border); border-radius: 8px; padding: 8px; }
+.account-panel { max-width: min(400px, calc(100vw - 36px)); }
+@media(max-width: 900px) { .my-altars-grid { grid-template-columns: 1fr; } .altar-name-control { top: auto; bottom: 18px; left: 370px; width: 180px; } }
+@media(max-width: 640px) { .altar-name-control { top: 178px; bottom: auto; left: 12px; width: 180px; } .app--menu-open .altar-name-control { display: none; } .account-name { display: none; } .my-altars { padding: 80px 20px 24px; } }
+
+.altar-name-control { top: auto; bottom: 18px; left: 72px; width: 320px; }
+.app--menu-open .altar-name-control { left: 370px; }
+.altar-name-control input { min-width: 0; flex: 1; }
+.altar-name-control .btn { flex: none; white-space: nowrap; font-size: 11px; }
+.altar-name-control > span { font-size: 10px; color: var(--ofrenda-muted); }
+@media (max-width: 640px) {
+  .altar-name-control { top: 178px; bottom: auto; left: 12px; width: calc(100% - 24px); }
+  .app--menu-open .altar-name-control { display: block; left: 20px; bottom: 20px; top: auto; width: calc(100% - 40px); z-index: 8; padding: 12px; border-radius: 12px; background: var(--ofrenda-panel); border: 1px solid var(--ofrenda-border); }
+  .menu-body { padding-bottom: 140px; }
+}
+
+.menu-my-altars { flex: none; text-decoration: none; text-align: center; }

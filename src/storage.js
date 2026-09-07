@@ -1,9 +1,7 @@
 import { isValidScene } from '../supabase/functions/_shared/scene-validation.js'
 // Guardado/lectura de altares compartidos, respaldado por Supabase.
-// Compartir pasa por la Edge Function `share-altar` (valida rate limit por
-// IP, sube la foto y hace el insert con la service role key: el cliente ya
-// no tiene permiso de insert directo). La lectura sigue siendo un select
-// directo, que es público.
+// Compartir exige sesión y pasa por share-altar. La base de datos limita
+// cada cuenta a tres altares; los enlaces públicos siguen siendo legibles.
 import { supabase } from './supabaseClient.js'
 
 // Slug + editToken del último altar compartido desde este navegador: al
@@ -11,29 +9,21 @@ import { supabase } from './supabaseClient.js'
 // crear un altar nuevo cada vez.
 const EDIT_KEY = 'altar-edit-v1'
 
-function loadEditInfo() {
+function loadEditInfo(userId) {
   try {
     const raw = localStorage.getItem(EDIT_KEY)
     const parsed = raw ? JSON.parse(raw) : null
-    return parsed?.slug && parsed?.editToken ? parsed : null
+    return parsed?.slug && parsed?.editToken && (!parsed.userId || parsed.userId === userId) ? parsed : null
   } catch {
     return null
   }
 }
 
-function saveEditInfo(slug, editToken) {
+function saveEditInfo(slug, editToken, userId) {
   try {
-    localStorage.setItem(EDIT_KEY, JSON.stringify({ slug, editToken }))
+    localStorage.setItem(EDIT_KEY, JSON.stringify({ slug, editToken, userId }))
   } catch {
     // almacenamiento lleno o bloqueado: se ignora, el próximo share crea uno nuevo
-  }
-}
-
-function clearEditInfo() {
-  try {
-    localStorage.removeItem(EDIT_KEY)
-  } catch {
-    // sin acceso a localStorage: nada que limpiar
   }
 }
 
@@ -42,44 +32,40 @@ async function invokeShareAltar(body) {
 
   if (error) {
     let message = 'No se pudo compartir el altar.'
-    let invalidEditToken = false
     try {
       const errorBody = await error.context?.json()
       if (errorBody?.error) message = errorBody.error
-      invalidEditToken = errorBody?.invalidEditToken === true
     } catch {
       // Sin body legible (ej. error de red): se usa el mensaje genérico.
     }
-    const err = new Error(message)
-    err.invalidEditToken = invalidEditToken
-    throw err
+    throw new Error(message)
   }
 
   return data
 }
 
-export async function saveSharedAltar({ objects, photo, name, clothColor }) {
-  const editInfo = loadEditInfo()
+export async function saveSharedAltar({ objects, photo, name, clothColor, slug, managed = false }) {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) throw new Error('Inicia sesión para guardar tus altares.')
+  const editInfo = managed ? null : loadEditInfo(session.user.id)
   const body = { objects, photo, name, clothColor }
-  if (editInfo) Object.assign(body, editInfo)
-
-  let data
-  try {
-    data = await invokeShareAltar(body)
-  } catch (err) {
-    if (editInfo && err.invalidEditToken) {
-      // El altar guardado ya no existe o el token no matchea (ej. se borró
-      // desde el panel de admin): se limpia y se reintenta como uno nuevo.
-      clearEditInfo()
-      data = await invokeShareAltar({ objects, photo, name, clothColor })
-    } else {
-      throw err
-    }
-  }
-
+  if (slug) body.slug = slug
+  else if (editInfo) Object.assign(body, editInfo)
+  const data = await invokeShareAltar(body)
   if (!data?.slug) throw new Error('No se pudo compartir el altar.')
-  if (data.editToken) saveEditInfo(data.slug, data.editToken)
+  if (!managed && data.editToken) saveEditInfo(data.slug, data.editToken, session.user.id)
   return data
+}
+
+export async function listMyAltars() {
+  const { data, error } = await supabase.rpc('my_altars')
+  if (error) throw new Error('No se pudieron cargar tus altares. Revisa tu conexión y la configuración del servidor.')
+  return data ?? []
+}
+
+export async function deleteMyAltar(slug) {
+  const { data, error } = await supabase.rpc('delete_my_altar', { p_slug: slug })
+  if (error || !data) throw new Error('No se pudo eliminar el altar.')
 }
 
 export async function reportAltar(slug) {

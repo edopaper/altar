@@ -111,10 +111,17 @@ Deno.serve(async (req) => {
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
+  const bearer = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
+  if (!bearer) return json({ error: 'Inicia sesión para guardar tus altares.' }, 401);
+  const { data: authData, error: authError } = await supabase.auth.getUser(bearer);
+  if (authError || !authData.user) return json({ error: 'Tu sesión expiró. Vuelve a iniciar sesión.' }, 401);
+  const userId = authData.user.id;
+
   // Sube la foto (si hay) al path `${slug}.${ext}`; `upsert` en true permite
   // reemplazar la foto de un altar que ya existe.
-  async function uploadPhoto(slug: string, upsert: boolean): Promise<string | null> {
+  async function uploadPhoto(slug: string, upsert: boolean, existingPhoto: string | null = null): Promise<string | null> {
     if (typeof photo !== "string" || !photo) return null;
+    if (existingPhoto && photo === existingPhoto) return existingPhoto;
     const decoded = decodeDataUrl(photo);
     if (!decoded) throw json({ error: "Foto inválida." }, 400);
     if (decoded.bytes.byteLength > PHOTO_MAX_BYTES) {
@@ -139,17 +146,17 @@ Deno.serve(async (req) => {
   // y coinciden con lo que guardamos al crearlo. No consume el rate limit de
   // altares nuevos, y no toca `status`/`reported_count` (el historial de
   // moderación se conserva aunque se edite el contenido).
-  if (typeof requestedSlug === "string" && requestedSlug && typeof editToken === "string" && editToken) {
+  if (typeof requestedSlug === "string" && requestedSlug) {
     const { data: existing, error: fetchError } = await supabase
       .from("altars")
-      .select("edit_token")
+      .select("edit_token, owner_id, photo_url")
       .eq("slug", requestedSlug)
       .maybeSingle();
 
     if (fetchError) {
       return json({ error: "No se pudo actualizar el altar." }, 500);
     }
-    if (!existing || existing.edit_token !== editToken) {
+    if (!existing || (existing.owner_id ? existing.owner_id !== userId : (!editToken || existing.edit_token !== editToken))) {
       return json(
         { error: "No tenés permiso para editar ese altar.", invalidEditToken: true },
         403,
@@ -175,7 +182,7 @@ Deno.serve(async (req) => {
 
     let photoUrl: string | null;
     try {
-      photoUrl = await uploadPhoto(requestedSlug, true);
+      photoUrl = await uploadPhoto(requestedSlug, true, existing.photo_url);
     } catch (res) {
       return res as Response;
     }
@@ -185,13 +192,14 @@ Deno.serve(async (req) => {
       .update({
         name: (name as string) || "Altar de muertos",
         objects: cleanObjects,
+        owner_id: userId,
         photo_url: photoUrl,
         cloth_color: (clothColor as string) ?? null,
       })
       .eq("slug", requestedSlug);
 
     if (updateError) {
-      return json({ error: "No se pudo actualizar el altar." }, 500);
+      return json({ error: updateError.code === "P0001" ? "Ya tienes 3 altares. Elimina uno desde Mis altares para guardar otro." : "No se pudo actualizar el altar." }, updateError.code === "P0001" ? 409 : 500);
     }
 
     return json({ slug: requestedSlug, editToken, updated: true });
@@ -246,12 +254,16 @@ Deno.serve(async (req) => {
       photo_url: photoUrl,
       cloth_color: (clothColor as string) ?? null,
       edit_token: newEditToken,
+      owner_id: userId,
     });
 
     if (!insertError) {
       return json({ slug, editToken: newEditToken, remaining: slot.remaining, limit: RATE_LIMIT });
     }
 
+    if (insertError.code === "P0001" || (insertError.code === "23505" && insertError.message?.includes("altars_owner_slot_unique"))) {
+      return json({ error: "Ya tienes 3 altares. Elimina uno desde Mis altares para guardar otro." }, 409);
+    }
     if (insertError.code !== "23505") {
       return json({ error: "No se pudo guardar el altar." }, 500);
     }

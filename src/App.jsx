@@ -1,6 +1,7 @@
 import { lazy, useEffect, useState } from 'react'
 import { supabase } from './supabaseClient.js'
 import { consumeLoginRoute } from './auth.js'
+const MyAltars = lazy(() => import('./components/MyAltars.jsx'))
 const AltarEditor = lazy(() => import('./AltarEditor.jsx'))
 const AltarViewer = lazy(() => import('./components/AltarViewer.jsx'))
 const ThumbnailStage = lazy(() => import('./components/ThumbnailStage.jsx'))
@@ -38,6 +39,7 @@ export default function App() {
   if (thumbMatch) return <ThumbnailStage path={decodeURIComponent(thumbMatch[1])} />
   const viewMatch = hash.match(/^#\/ver\/([a-z0-9]+)/i)
   if (viewMatch) return <AltarViewer key={viewMatch[1]} slug={viewMatch[1]} />
+  if (hash.startsWith('#/mis-altares')) return <MyAltars key={hash} route={hash} />
   if (hash.startsWith('#/admin')) return <AdminDashboard />
   return <AltarEditor />
 }

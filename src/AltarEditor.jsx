@@ -62,46 +62,24 @@ async function copyToClipboard(text) {
   }
 }
 
-// Recuerda el último altar compartido (huella del contenido + url) en
-// localStorage, no solo en memoria: así "sin cambios desde la última vez"
-// sigue siendo válido aunque se recargue la página o se vuelva otro día.
-const LAST_SHARE_KEY = 'altar-last-share-v1'
-
-function loadLastShare() {
-  try {
-    const raw = readLocal(LAST_SHARE_KEY)
-    return raw ? JSON.parse(raw) : null
-  } catch {
-    return null
-  }
-}
-
-function saveLastShare(entry) {
-  try {
-    writeLocal(LAST_SHARE_KEY, JSON.stringify(entry))
-  } catch {
-    // almacenamiento lleno o bloqueado: se ignora, solo se pierde el atajo
-  }
-}
-
 // Restaura la escena guardada; descarta objetos cuyo .glb ya no exista en la
 // carpeta de modelos (p. ej. si se renombró o movió el archivo).
-function loadSavedObjects() {
+function loadSavedObjects(prefix = '', fallback = []) {
   try {
-    const raw = readLocal(STORAGE_KEY)
-    if (!raw) return []
+    const raw = readLocal(prefix + STORAGE_KEY)
+    if (!raw) return fallback
     const saved = JSON.parse(raw)
     return restoreScene(saved)
   } catch {
-    return []
+    return fallback
   }
 }
 
 let nextId = 1
 
-export default function AltarEditor() {
+export default function AltarEditor({ initialAltar = null, draftPrefix = '' }) {
   const [objects, setObjects] = useState(() => {
-    const saved = loadSavedObjects()
+    const saved = loadSavedObjects(draftPrefix, initialAltar?.objects ?? [])
     nextId = saved.reduce((max, o) => Math.max(max, o.id), 0) + 1
     return saved
   })
@@ -204,7 +182,12 @@ export default function AltarEditor() {
     setCanUndo(true)
   }, [])
 
-  const [photo, setPhoto] = useState(() => readLocal(PHOTO_KEY))
+  const [photo, setPhoto] = useState(() => {
+    const saved = readLocal(draftPrefix + PHOTO_KEY)
+    if (!draftPrefix) return saved
+    try { return saved === null ? initialAltar?.photo_url ?? null : JSON.parse(saved) }
+    catch { return initialAltar?.photo_url ?? null }
+  })
   const [isSharing, setIsSharing] = useState(false)
   // Modal de compartir (redes sociales + link): null mientras está cerrado.
   const [shareInfo, setShareInfo] = useState(null)
@@ -213,14 +196,6 @@ export default function AltarEditor() {
   const [sharePreview, setSharePreview] = useState(null)
   const [toast, setToast] = useState(null)
   const toastTimerRef = useRef(null)
-  // Último altar compartido con éxito: si al tocar "Compartir" de nuevo el
-  // contenido es idéntico, se reusa el link ya generado en vez de volver a
-  // pegarle a la Edge Function (menos carga, y no gasta cupo del rate limit).
-  // Se precarga desde localStorage para que la detección de "sin cambios"
-  // sobreviva a un reload, no solo dentro de la misma sesión.
-  const [initialShare] = useState(loadLastShare)
-  const lastSharedRef = useRef(initialShare)
-
   const showToast = useCallback((message, type = 'info', duration = 5000, action = null) => {
     clearTimeout(toastTimerRef.current)
     setToast({ message, type, action })
@@ -229,9 +204,9 @@ export default function AltarEditor() {
   useEffect(() => () => clearTimeout(toastTimerRef.current), [])
 
   const [clothColor, setClothColor] = useState(
-    () => isColor(readLocal(CLOTH_COLOR_KEY)) ? readLocal(CLOTH_COLOR_KEY) : DEFAULT_CLOTH_COLOR,
+    () => isColor(readLocal(draftPrefix + CLOTH_COLOR_KEY, initialAltar?.cloth_color ?? DEFAULT_CLOTH_COLOR)) ? readLocal(draftPrefix + CLOTH_COLOR_KEY, initialAltar?.cloth_color ?? DEFAULT_CLOTH_COLOR) : DEFAULT_CLOTH_COLOR,
   )
-  const draft = useDraftPersistence(objects, photo, clothColor)
+  const draft = useDraftPersistence(objects, photo, clothColor, draftPrefix)
 
   const uploadPhoto = async (file) => {
     if (!file) return
@@ -263,28 +238,19 @@ export default function AltarEditor() {
     withCleanCanvas((canvas) => setSharePreview(canvas.toDataURL('image/jpeg', 0.8)))
   }
 
-  // Publica un snapshot del altar bajo un slug y abre el modal de
-  // compartir (redes sociales + link). Si el contenido es igual al del
-  // último share exitoso, no vuelve a llamar a la Edge Function: reabre el
-  // modal con el link ya existente.
+  // Guardar vuelve a verificar la sesión y la propiedad en el servidor.
+  const [altarName, setAltarName] = useState(() => readLocal(draftPrefix + 'altar-name-v1', initialAltar?.name ?? 'Mi altar'))
+  useEffect(() => { writeLocal(draftPrefix + 'altar-name-v1', altarName) }, [altarName, draftPrefix])
+  const savedSlug = useRef(initialAltar?.slug ?? (initialAltar ? readLocal(draftPrefix + 'altar-slug-v1') : null))
   const shareAltar = async () => {
     if (isSharing) return
 
-    const shareKey = JSON.stringify({ objects, photo, clothColor })
-    const cached = lastSharedRef.current
-    if (cached && cached.key === shareKey) {
-      copyToClipboard(cached.url) // best-effort, el modal ya deja copiar a mano
-      setShareInfo({ url: cached.url, note: 'Sin cambios desde la última vez.' })
-      return
-    }
-
     setIsSharing(true)
     try {
-      const { slug, remaining, limit, updated } = await saveSharedAltar({ objects, photo, clothColor })
+      const { slug, remaining, limit, updated } = await saveSharedAltar({ objects, photo, clothColor, name: altarName, slug: savedSlug.current, managed: Boolean(initialAltar) })
+      savedSlug.current = slug
+      if (initialAltar) writeLocal(draftPrefix + 'altar-slug-v1', slug)
       const url = `${window.location.origin}${window.location.pathname}#/ver/${slug}`
-      const entry = { key: shareKey, url }
-      lastSharedRef.current = entry
-      saveLastShare(entry)
       copyToClipboard(url) // best-effort, el modal ya deja copiar a mano
 
       const limitNote =
@@ -552,6 +518,12 @@ export default function AltarEditor() {
     <div className={`app ${menuOpen ? 'app--menu-open' : ''}`}>
       {!menuOpen && <QualityControls floating />}
       <UserAccount />
+      <div className="altar-name-control">
+        <label htmlFor="altar-name">Nombre de tu altar</label>
+        <div className="shape-row"><input id="altar-name" maxLength={120} value={altarName} onChange={e => setAltarName(e.target.value)} />
+        <button className="btn btn--primary" disabled={isSharing || !objects.length} onClick={shareAltar}>{isSharing ? 'Guardando…' : 'Guardar altar'}</button></div>
+        <span>Se guarda con un enlace para compartir.</span>
+      </div>
       {!menuOpen && <div className="draft-status" role="status">
         {draft.status === 'saving' ? 'Guardando…' : draft.status === 'saved' ? 'Guardado en este navegador' : 'No se pudo guardar en este navegador'}
         {draft.status === 'error' && <button className="btn" onClick={draft.retry}>Reintentar</button>}
@@ -648,7 +620,10 @@ export default function AltarEditor() {
         />
       )}
       {shareInfo && (
-        <ShareModal url={shareInfo.url} note={shareInfo.note} onClose={() => setShareInfo(null)} />
+        <ShareModal url={shareInfo.url} note={shareInfo.note} onClose={() => {
+          setShareInfo(null)
+          if (initialAltar && !initialAltar.slug && savedSlug.current) window.location.hash = `#/mis-altares/editar/${savedSlug.current}`
+        }} />
       )}
       {sharePreview && (
         <SharePreviewModal

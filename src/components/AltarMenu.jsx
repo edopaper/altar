@@ -154,6 +154,7 @@ export default function AltarMenu({
 
       <div className="menu-body">
       <p className="menu-intro">Un lugar para recordar y celebrar la vida.</p>
+      <a className="btn menu-my-altars" href="#/mis-altares">Mis altares · hasta 3 por cuenta →</a>
       <section className="menu-section">
         <h2>
           Objetos en escena ({objects.length}/{maxObjects})

@@ -61,6 +61,17 @@ Pulsa «Entrar con Google», elige una cuenta y verifica que vuelvas al mismo al
 - `redirect_uri_mismatch`: revisa el callback de **Supabase** registrado en **Google**.
 - Retorno a un dominio/puerto incorrecto: revisa las URLs de la **app** registradas en **Supabase**.
 
-Iniciar sesión identifica al visitante. El borrador sigue guardándose en este navegador; sincronizar altares entre dispositivos requiere asociarlos a `auth.uid()` y definir las políticas de acceso correspondientes.
+Iniciar sesión permite guardar y administrar hasta tres altares desde «Mis altares». Los cambios del editor se conservan como borradores locales separados por cuenta y altar. Pulsa «Guardar altar» para sincronizarlos con Supabase; al guardar se conserva el enlace público.
 
 Referencias: [Google en Supabase](https://supabase.com/docs/guides/auth/social-login/auth-google) y [URLs de retorno](https://supabase.com/docs/guides/auth/redirect-urls).
+
+
+## Mis altares y máximo de 3 por cuenta
+
+- Ruta `#/mis-altares`: lista propia, creación, edición y eliminación con confirmación. Los altares ocultos también cuentan para el límite.
+- Migración `supabase/016_user_altars.sql`: propietario privado, tres espacios por cuenta, índice único y asignación transaccional. Las RPC `my_altars` y `delete_my_altar` usan `auth.uid()` y no aceptan un ID de propietario enviado por el cliente.
+- `share-altar` verifica el JWT con `getUser`. Los altares nuevos requieren sesión. Un altar que ya tiene propietario solo puede editarlo esa cuenta; un token antiguo no evita esta comprobación.
+- Los altares anónimos anteriores mantienen su enlace. Para asociar el último altar anterior a tu cuenta, inicia sesión en el navegador que lo publicó y vuelve a guardarlo: debe conservar su token de edición y la cuenta debe tener cupo. No se adjudican automáticamente altares por nombre o correo.
+- Eliminar libera un espacio y borra los mensajes por cascada. La fotografía subida al bucket no se purga mediante esta RPC.
+- Despliegue: aplicar primero 016 en SQL Editor o `supabase db query --linked --file supabase/016_user_altars.sql`, después `supabase functions deploy share-altar`, y publicar el frontend. La migración se aplica una sola vez.
+- Prueba SQL: ejecutar `tests/user-altars.sql` entre `BEGIN` y `ROLLBACK` después de 016; verifica cupo, aislamiento, actualización y reutilización de espacios con datos temporales.

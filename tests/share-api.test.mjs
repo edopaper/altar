@@ -6,13 +6,17 @@ const shape = { id: 1, name: 'Recuerdo', type: 'shape', shapeKind: 'cube', posit
 let handler
 let clientCalls = 0
 const writes = []
+let testUser = { id: 'user-1' }
+let existingOwner = null
+let insertFailure = null
 globalThis.__edgeTestClient = () => {
   clientCalls++
   return {
+    auth: { getUser: async () => ({ data: { user: testUser }, error: null }) },
     rpc: () => ({ data: true, error: null, single: async () => ({ data: { allowed: true, remaining: 4 }, error: null }) }),
     from: () => ({
-      select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { edit_token: 'valid-token' }, error: null }) }) }),
-      insert: async (data) => { writes.push(data); return { error: null } },
+      select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { edit_token: 'valid-token', owner_id: existingOwner, photo_url: 'https://example.test/photo.jpg' }, error: null }) }) }),
+      insert: async (data) => { writes.push(data); return { error: insertFailure } },
       update: (data) => ({ eq: async () => { writes.push(data); return { error: null } } }),
     }),
     storage: { from: () => ({ upload: async () => ({ error: null }), getPublicUrl: () => ({ data: { publicUrl: 'https://example.test/photo.jpg' } }) }) },
@@ -24,7 +28,7 @@ const compiled = await build({ entryPoints: ['supabase/functions/share-altar/ind
   build.onLoad({ filter: /.*/, namespace: 'mock' }, () => ({ contents: 'export const createClient = () => globalThis.__edgeTestClient()' }))
 } }] })
 await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString('base64')}`)
-const request = (body) => new Request('http://example.test/share', { method: 'POST', body: JSON.stringify(body) })
+const request = (body) => new Request('http://example.test/share', { method: 'POST', headers: { authorization: 'Bearer test-jwt' }, body: JSON.stringify(body) })
 test('API rechaza objetos y colores inválidos antes de acceder a la base de datos', async () => {
   const before = clientCalls
   for (const body of [{ objects: [null] }, { objects: [shape, shape] }, { objects: [shape], clothColor: 'red' }, { objects: [], name: {} }, { objects: [{ ...shape, type: 'model', modelPath: 'https://example.test/evil.glb' }] }]) {
@@ -57,4 +61,36 @@ test('lector limita cuerpos con y sin Content-Length', async () => {
   assert.deepEqual(await readJsonBody(request({ name: 'José' }), 64), { name: 'José' })
   await assert.rejects(readJsonBody(request({ text: 'a'.repeat(100) }), 64), (error) => error.status === 413)
   await assert.rejects(readJsonBody(new Request('http://example.test', { method: 'POST', headers: { 'content-length': '100' }, body: '{}' }), 64), (error) => error.status === 413)
+})
+
+test('guardar requiere una cuenta autenticada', async () => {
+  testUser = null
+  const before = writes.length
+  const response = await handler(request({ objects: [shape] }))
+  assert.equal(response.status, 401)
+  assert.equal(writes.length, before)
+  testUser = { id: 'user-1' }
+})
+test('un token antiguo no permite editar el altar de otra cuenta', async () => {
+  existingOwner = 'user-2'
+  const before = writes.length
+  const response = await handler(request({ objects: [shape], slug: 'abc12', editToken: 'valid-token' }))
+  assert.equal(response.status, 403)
+  assert.equal(writes.length, before)
+  existingOwner = null
+})
+test('el propietario actualiza sin token y conserva la fotografía remota', async () => {
+  existingOwner = 'user-1'
+  const response = await handler(request({ objects: [shape], slug: 'abc12', photo: 'https://example.test/photo.jpg' }))
+  assert.equal(response.status, 200)
+  assert.equal(writes.at(-1).photo_url, 'https://example.test/photo.jpg')
+  assert.equal(writes.at(-1).owner_id, 'user-1')
+  existingOwner = null
+})
+test('el límite de base de datos se devuelve como un conflicto de cupo', async () => {
+  insertFailure = { code: 'P0001' }
+  const response = await handler(request({ objects: [shape] }))
+  assert.equal(response.status, 409)
+  assert.match((await response.json()).error, /3 altares/)
+  insertFailure = null
 })
