@@ -230,6 +230,7 @@ export default function CietPage() {
           onTransform={noop}
           focusRef={focusRef}
           autoOrbit
+          uiIdle={idle}
           respectReducedMotionForAutoOrbit={false}
           messages={[]}
         />

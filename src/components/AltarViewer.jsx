@@ -207,7 +207,6 @@ export default function AltarViewer({ slug }) {
           <a href="#/admin">Volver al panel</a>
         </div>
       )}
-      <QualityControls floating />
       <Canvas shadows dpr={[1, 1.5]} camera={{ position: [0, 3.2, 5.5], fov: 50 }}>
         <AltarScene
           photo={data.photo}
@@ -231,6 +230,7 @@ export default function AltarViewer({ slug }) {
 
       <div className={`viewer-ui ${idle ? 'viewer-ui--hidden' : ''}`}>
         <UserAccount compact />
+        <QualityControls floating />
         <div className="viewer-bar">
           <div className="viewer-bar-head">
             <span className="viewer-title">{data.name}</span>
