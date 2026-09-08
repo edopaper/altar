@@ -120,6 +120,7 @@ export default function AltarEditor({ initialAltar = null, draftPrefix = '' }) {
     }
   }, [])
   const [templatesOpen, setTemplatesOpen] = useState(false)
+  const [namePanelOpen, setNamePanelOpen] = useState(true)
   const [objects, setObjects] = useState(() => {
     const saved = restoreScene(workspace.content.objects)
     nextId = saved.reduce((max, o) => Math.max(max, o.id), 0) + 1
@@ -564,16 +565,28 @@ export default function AltarEditor({ initialAltar = null, draftPrefix = '' }) {
     <div className={`app ${menuOpen ? 'app--menu-open' : ''}`}>
       {!menuOpen && <QualityControls floating />}
       <UserAccount />
-      <div className="altar-name-control">
-        <label htmlFor="altar-name">Nombre de tu altar</label>
-        <div className="shape-row"><input id="altar-name" maxLength={120} value={altarName} onChange={e => setAltarName(e.target.value)} />
-        <button className="btn btn--primary" disabled={isSharing || !!cloud.conflict} onClick={() => cloud.save(false)}>{isSharing ? 'Guardando…' : 'Guardar borrador'}</button></div>
-        <p role="status">{!cloud.online ? 'Sin conexión. Tus cambios se conservan en este navegador.' : cloud.busy ? 'Sincronizando…' : cloud.dirty ? 'Cambios pendientes de sincronizar' : 'Sincronizado con tu cuenta'}{cloud.updated_at && ` · Última sincronización: ${new Date(cloud.updated_at).toLocaleString('es-MX')}`}</p>
-        <span>{cloud.is_published ? 'Los cambios del borrador solo aparecen en el enlace al publicar.' : 'Borrador privado. Solo será visible cuando lo publiques.'}</span>
-        <div className="shape-row"><button className="btn" disabled={isSharing || !!cloud.conflict} onClick={requestShare}>{cloud.is_published ? 'Publicar cambios' : 'Publicar altar'}</button><button className="btn" onClick={() => setTemplatesOpen(true)}>Plantillas</button></div>
-        {cloud.error && <p role="alert">{cloud.error} <button className="btn" disabled={isSharing || !!cloud.conflict} onClick={() => cloud.save(false)}>Reintentar</button></p>}
-        {cloud.localError && <p role="alert">No se pudo guardar la copia local. <button className="btn" onClick={cloud.retryLocal}>Reintentar</button></p>}
-        {readLocal(draftPrefix + 'recovery-v2') && <button className="menu-about-link" onClick={cloud.restoreRecovery}>Recuperar copia anterior</button>}
+      <div className={`altar-name-control ${namePanelOpen ? '' : 'altar-name-control--collapsed'}`}>
+        <button
+          className="altar-name-toggle"
+          type="button"
+          onClick={() => setNamePanelOpen((open) => !open)}
+          aria-expanded={namePanelOpen}
+          aria-controls="altar-name-panel"
+        >
+          <span>{altarName || 'Mi altar'}</span>
+          <span aria-hidden="true">{namePanelOpen ? '▾' : '▴'}</span>
+        </button>
+        <div id="altar-name-panel" className="altar-name-panel" hidden={!namePanelOpen}>
+          <label htmlFor="altar-name">Nombre de tu altar</label>
+          <div className="shape-row"><input id="altar-name" maxLength={120} value={altarName} onChange={e => setAltarName(e.target.value)} />
+          <button className="btn btn--primary" disabled={isSharing || !!cloud.conflict} onClick={() => cloud.save(false)}>{isSharing ? 'Guardando…' : 'Guardar borrador'}</button></div>
+          <p role="status">{!cloud.online ? 'Sin conexión. Tus cambios se conservan en este navegador.' : cloud.busy ? 'Sincronizando…' : cloud.dirty ? 'Cambios pendientes de sincronizar' : 'Sincronizado con tu cuenta'}{cloud.updated_at && ` · Última sincronización: ${new Date(cloud.updated_at).toLocaleString('es-MX')}`}</p>
+          <span>{cloud.is_published ? 'Los cambios del borrador solo aparecen en el enlace al publicar.' : 'Borrador privado. Solo será visible cuando lo publiques.'}</span>
+          <div className="shape-row"><button className="btn" disabled={isSharing || !!cloud.conflict} onClick={requestShare}>{cloud.is_published ? 'Publicar cambios' : 'Publicar altar'}</button><button className="btn" onClick={() => setTemplatesOpen(true)}>Plantillas</button></div>
+          {cloud.error && <p role="alert">{cloud.error} <button className="btn" disabled={isSharing || !!cloud.conflict} onClick={() => cloud.save(false)}>Reintentar</button></p>}
+          {cloud.localError && <p role="alert">No se pudo guardar la copia local. <button className="btn" onClick={cloud.retryLocal}>Reintentar</button></p>}
+          {readLocal(draftPrefix + 'recovery-v2') && <button className="menu-about-link" onClick={cloud.restoreRecovery}>Recuperar copia anterior</button>}
+        </div>
       </div>
       {!menuOpen && <div className="draft-status" role="status">
         {draft.status === 'saving' ? 'Guardando…' : draft.status === 'saved' ? 'Guardado en este navegador' : 'No se pudo guardar en este navegador'}
