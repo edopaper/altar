@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { POST_LOGIN_REDIRECT_KEY, rememberLoginRoute } from '../auth.js'
 import { isValidScene } from '../../supabase/functions/_shared/scene-validation.js'
@@ -11,6 +11,7 @@ const DEFAULT_CIET_INTERVAL = 30
 const MIN_CIET_INTERVAL = 5
 const IDLE_DELAY_MS = 4000
 const noop = () => {}
+const StableMusicPlayer = memo(MusicPlayer)
 
 function useIdle(delayMs) {
   const [idle, setIdle] = useState(false)
@@ -162,7 +163,7 @@ export default function CietPage() {
   if (session === undefined || (session && isAdmin === null) || (session && isAdmin && status === 'loading')) {
     return (
       <div className="viewer-missing">
-        <h1>Cargando CIET…</h1>
+        <h1>Cargando Altares</h1>
       </div>
     )
   }
@@ -219,7 +220,6 @@ export default function CietPage() {
       </div>
       <Canvas shadows dpr={[1, 1.5]} camera={{ position: [0, 3.2, 5.5], fov: 50 }}>
         <AltarScene
-          key={activeAltar.slug}
           photo={activeAltar.photo}
           clothColor={activeAltar.clothColor}
           objects={activeAltar.objects}
@@ -230,13 +230,14 @@ export default function CietPage() {
           onTransform={noop}
           focusRef={focusRef}
           autoOrbit
+          respectReducedMotionForAutoOrbit={false}
           messages={[]}
         />
       </Canvas>
 
       <div className="ciet-overlay">
         <div>
-          <span className="ciet-kicker">CIET</span>
+          <span className="ciet-kicker">Altares CGTI</span>
           <h1>{activeAltar.name}</h1>
         </div>
         <div className={`ciet-meta ciet-ui ${idle ? 'ciet-ui--hidden' : ''}`}>
@@ -253,7 +254,7 @@ export default function CietPage() {
         </a>
       </div>
       <div className={`ciet-music ciet-ui ${idle ? 'ciet-ui--hidden' : ''}`}>
-        <MusicPlayer />
+        <StableMusicPlayer />
       </div>
     </div>
   )

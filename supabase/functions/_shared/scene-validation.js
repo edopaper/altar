@@ -12,6 +12,7 @@ export function isValidObject(object) {
   if (!vector(object.position, 1000) || !vector(object.rotation, 10000) || !vector(object.scale, 100)) return false
   if (object.scale.some((n) => Math.abs(n) < 0.001) || !isColor(object.color)) return false
   if (object.locked !== undefined && typeof object.locked !== 'boolean') return false
+  if (object.configuredScale !== undefined && typeof object.configuredScale !== 'boolean') return false
   if (object.type === 'shape') return shapes.has(object.shapeKind)
   if (object.type === 'model') return models.has(object.modelPath)
   if (object.type === 'paper') return papers.has(object.paperPath)
@@ -24,7 +25,7 @@ export function isValidScene(objects) {
 export function cleanObject(o) {
   return { id: o.id, type: o.type, name: o.name.trim(), position: o.position, rotation: o.rotation,
     scale: o.scale, color: o.color, locked: o.locked ?? false,
-    ...(o.type === 'shape' ? { shapeKind: o.shapeKind } : o.type === 'model' ? { modelPath: o.modelPath } : { paperPath: o.paperPath }) }
+    ...(o.type === 'shape' ? { shapeKind: o.shapeKind } : o.type === 'model' ? { modelPath: o.modelPath, ...(o.configuredScale === true ? { configuredScale: true } : {}) } : { paperPath: o.paperPath }) }
 }
 export function restoreScene(objects) {
   if (!Array.isArray(objects)) return []

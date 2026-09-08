@@ -3,6 +3,7 @@ import { readLocal, writeLocal } from './localStore.js'
 import useCloudDraft from './useCloudDraft.js'
 import { restoreDraft } from './draftState.js'
 import { TEMPLATES, createTemplate } from './templates.js'
+import { configuredScaleVector } from './modelScale.js'
 import Modal from './components/Modal.jsx'
 import { restoreScene, isColor } from '../supabase/functions/_shared/scene-validation.js'
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
@@ -387,8 +388,9 @@ export default function AltarEditor({ initialAltar = null, draftPrefix = '' }) {
       name: `${model.name} ${nextId - 1}`,
       position: [...SPAWN_POSITION],
       rotation: [0, 0, 0],
-      scale: [1, 1, 1],
+      scale: configuredScaleVector(model.path),
       color: '#ffffff',
+      configuredScale: true,
     }
     pushHistory()
     setObjects((prev) => [...prev, obj])

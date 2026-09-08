@@ -88,7 +88,7 @@ export default function AltarObject({
     object.type === 'model' ? (
       <SceneErrorBoundary key={object.modelPath}>
         <Suspense fallback={<LoadingCube />}>
-          <ModelLoader path={object.modelPath} />
+          <ModelLoader path={object.modelPath} applyConfiguredScale={!object.configuredScale} />
         </Suspense>
       </SceneErrorBoundary>
     ) : object.type === 'paper' ? (

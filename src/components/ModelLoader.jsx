@@ -70,10 +70,11 @@ function getConfiguredScale(modelPath, scaleConfig) {
 
 /**
  * Carga un .glb respetando sus materiales originales. La normalización de
- * escala vive en un group interno, así el scale del estado sigue siendo [1,1,1]
- * y el gizmo de escala parte de una base neutra.
+ * tamaño físico vive en un group interno. La escala personalizada del JSON se
+ * aplica aquí solo para altares viejos; los objetos nuevos ya la traen en su
+ * transform para que el gizmo muestre el tamaño real editable.
  */
-export default function ModelLoader({ path }) {
+export default function ModelLoader({ path, applyConfiguredScale = true }) {
   const { scene } = useGLTF(path, '/draco/')
   const gl = useThree((state) => state.gl)
 
@@ -93,11 +94,11 @@ export default function ModelLoader({ path }) {
   const { factor, offsetY, topY } = useMemo(() => {
     const { minY, size } = getSceneBounds(scene)
     const maxDim = Math.max(size.x, size.y, size.z) || 1
-    const configuredScale = getConfiguredScale(path, scaleConfig)
+    const configuredScale = applyConfiguredScale ? getConfiguredScale(path, scaleConfig) : 1
     const f = (TARGET_SIZE / maxDim) * configuredScale
     // Apoya el modelo sobre su base (y=0 local) en lugar de su origen arbitrario.
     return { factor: f, offsetY: -minY * f, topY: size.y * f }
-  }, [scene, path, scaleConfig])
+  }, [scene, path, scaleConfig, applyConfiguredScale])
 
   // Los modelos de la carpeta de velas llevan flama parpadeante en la punta.
   // La flama va FUERA del group normalizado: las luces no escalan bien dentro.

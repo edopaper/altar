@@ -363,11 +363,13 @@ export default function AltarScene({
   onGroupDragEnd,
   focusRef,
   autoOrbit = false,
+  respectReducedMotionForAutoOrbit = true,
   messages = [],
   clothColor,
 }) {
   const orbitRef = useRef()
   const { reducedMotion } = useQuality()
+  const shouldAutoOrbit = autoOrbit && (!reducedMotion || !respectReducedMotionForAutoOrbit)
 
   // Expone a la UI una función para centrar la cámara en una posición.
   useEffect(() => {
@@ -387,7 +389,7 @@ export default function AltarScene({
       <color attach="background" args={['#4a3a68']} />
       <fog attach="fog" args={['#57457a', 9, 24]} />
 
-      <RenderQuality />
+      <RenderQuality forceAlways={shouldAutoOrbit} />
       <CeremonialLights />
       <Room />
       <AltarSteps clothColor={clothColor} />
@@ -423,11 +425,13 @@ export default function AltarScene({
         />
       )}
 
-      {autoOrbit && !reducedMotion && <IdleOrbit orbitRef={orbitRef} />}
+      {shouldAutoOrbit && <IdleOrbit orbitRef={orbitRef} />}
 
       <OrbitControls
         ref={orbitRef}
         makeDefault
+        autoRotate={shouldAutoOrbit}
+        autoRotateSpeed={ORBIT_SPEED}
         target={ALTAR_CENTER.toArray()}
         minDistance={1.5}
         maxDistance={12}

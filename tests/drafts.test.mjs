@@ -31,6 +31,10 @@ test('las tres plantillas contienen escenas válidas e independientes', () => {
     result.objects[0].position[0] = 999
     assert.notEqual(createTemplate(template.id).objects[0].position[0], 999)
   }
+  const sencillo = createTemplate('sencillo')
+  const cempasuchil = sencillo.objects.find((object) => object.modelPath === '/models/altar/decoracion/jarron-cempasuchil.glb')
+  assert.deepEqual(cempasuchil.scale, [2, 2, 2])
+  assert.equal(cempasuchil.configuredScale, true)
 })
 
 test('recargar no inventa cambios por campos opcionales u orden de propiedades', () => {
