@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from './supabaseClient.js'
 import { saveSharedAltar, listMyAltars } from './storage.js'
-import { contentOf, fingerprint } from './draftState.js'
+import { contentOf, fingerprint, hasContent } from './draftState.js'
 
 export default function useCloudDraft(content, applyContent, initial, prefix) {
   const [meta, setMeta] = useState(() => ({ ...initial, draftId: initial.draftId ?? crypto.randomUUID().replaceAll('-', '') }))
@@ -10,6 +10,9 @@ export default function useCloudDraft(content, applyContent, initial, prefix) {
   const [busy, setBusy] = useState(false)
   const [localError, setLocalError] = useState(false)
   const [online, setOnline] = useState(navigator.onLine)
+  // Con sesión el prefijo es `account:<id>:root:`; sin ella no hay a dónde
+  // subir el altar y el guardado es solo local.
+  const managed = prefix.startsWith('account:')
   const latest = useRef()
   latest.current = { content, meta, conflict }
   const lock = useRef(false)
@@ -75,7 +78,7 @@ export default function useCloudDraft(content, applyContent, initial, prefix) {
     const snapshot = latest.current
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session || !prefix.startsWith(`account:${session.user.id}:`)) throw new Error('Inicia sesión para guardar este borrador en tu cuenta.')
+      if (!session || !prefix.startsWith(`account:${session.user.id}:`)) throw new Error('Entra con Google para guardar y publicar tu altar.')
       const result = await saveSharedAltar({ ...snapshot.content, slug: snapshot.meta.slug, managed: true, draftId: snapshot.meta.draftId, revision: snapshot.meta.revision ?? 0, action: publish ? 'publish' : 'save', expectedUserId: session.user.id, editToken: snapshot.meta.editToken })
       if (!alive.current) return null
       setMeta({ ...result, baseline: fingerprint(snapshot.content) })
@@ -95,12 +98,22 @@ export default function useCloudDraft(content, applyContent, initial, prefix) {
       if (alive.current) setBusy(false)
     }
   }
-  // Create only on explicit save; existing drafts sync after ten quiet seconds.
+  // El borrador se guarda solo: con sesión, el primer cambio crea el altar
+  // en la cuenta (antes hacía falta apretar "Guardar borrador", que convivía
+  // confusamente con "Publicar") y los siguientes se sincronizan tras unos
+  // segundos de calma. Un error corta el ciclo a propósito: si la cuenta ya
+  // llegó al límite de altares no tiene sentido reintentar solo, el mensaje
+  // queda a la vista con su "Reintentar".
+  const CREATE_DELAY_MS = 2500
+  const SYNC_DELAY_MS = 10000
   useEffect(() => {
-    if (!meta.slug || !dirty || conflict || busy || error || !online) return
-    const timer = setTimeout(() => save(false), 10000)
+    if (!managed || !dirty || conflict || busy || error || !online) return
+    // El altar se crea recién cuando hay algo adentro; ya creado, se
+    // sincroniza siempre (incluso si quedó vacío tras borrar todo).
+    if (!meta.slug && !hasContent(content)) return
+    const timer = setTimeout(() => save(false), meta.slug ? SYNC_DELAY_MS : CREATE_DELAY_MS)
     return () => clearTimeout(timer)
-  }, [content, meta.slug, dirty, conflict, busy, error, online])
+  }, [content, meta.slug, dirty, conflict, busy, error, online, managed])
   const resolve = (useLocal) => {
     if (!conflict) return
     const remote = contentOf(conflict)
@@ -111,7 +124,7 @@ export default function useCloudDraft(content, applyContent, initial, prefix) {
     setConflict(null)
     setError('')
   }
-  return { ...meta, busy, dirty, conflict, error, online, localError, save, resolve,
+  return { ...meta, busy, dirty, conflict, error, online, localError, managed, save, resolve,
     retryLocal: () => setLocalError(!persist()),
     restoreRecovery: () => {
       try { const value = JSON.parse(localStorage.getItem(prefix + 'recovery-v2')); if (value) applyContent(value) } catch { setLocalError(true) }

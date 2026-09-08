@@ -5,6 +5,7 @@ import { useFrame } from '@react-three/fiber'
 import { TransformControls, useHelper } from '@react-three/drei'
 import ModelLoader from './ModelLoader.jsx'
 import PaperCutout from './PaperCutout.jsx'
+import { GRID_STEP } from '../arrange.js'
 
 const ROTATION_SNAP = THREE.MathUtils.degToRad(15)
 const SPAWN_PULSE_DURATION = 0.6 // segundos
@@ -133,9 +134,9 @@ export default function AltarObject({
         <TransformControls
           object={groupRef}
           mode={mode}
-          translationSnap={snap ? 0.1 : null}
+          translationSnap={snap ? GRID_STEP : null}
           rotationSnap={snap ? ROTATION_SNAP : null}
-          scaleSnap={snap ? 0.1 : null}
+          scaleSnap={snap ? GRID_STEP : null}
           onMouseDown={() => {
             if (orbitRef.current) orbitRef.current.enabled = false
           }}

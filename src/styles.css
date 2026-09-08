@@ -321,6 +321,64 @@ canvas {
   cursor: default;
 }
 
+/* ---------- Estado del borrador (una sola línea) ---------- */
+.draft-state,
+.publish-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 8px 0 0;
+}
+
+.draft-state .btn {
+  flex: 0 0 auto;
+}
+
+.draft-state--error {
+  color: #f4a8ad;
+}
+
+.draft-state--warn {
+  color: #ffcf8a;
+}
+
+.publish-state {
+  margin: 4px 0 8px;
+  color: #6f6690;
+}
+
+/* ---------- Acomodo de la selección (alinear / distribuir) ---------- */
+.arrange {
+  margin: 4px 0 2px;
+}
+
+/* Etiqueta del eje + sus tres botones. La etiqueta tiene ancho fijo para
+   que las columnas de botones queden alineadas entre filas. */
+.arrange-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.arrange-row--even .btn {
+  flex: 1;
+}
+
+.arrange-axis {
+  flex: 0 0 88px;
+  font-size: 11px;
+  color: #6f6690;
+}
+
+.btn--sm {
+  padding: 5px 4px;
+  font-size: 11px;
+}
+
 /* ---------- Toast ---------- */
 .toast {
   position: absolute;

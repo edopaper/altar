@@ -5,6 +5,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { OrbitControls, TransformControls } from '@react-three/drei'
 import AltarObject from './AltarObject.jsx'
+import { GRID_STEP } from '../arrange.js'
 import PhotoFrame from './PhotoFrame.jsx'
 import CandleLights from './CandleLights.jsx'
 import SoulField from './SoulField.jsx'
@@ -298,7 +299,7 @@ function GroupTransformControls({ objects, selectedIds, snap, onTranslateMany, o
       <TransformControls
         object={pivotRef}
         mode="translate"
-        translationSnap={snap ? 0.1 : null}
+        translationSnap={snap ? GRID_STEP : null}
         onMouseDown={() => {
           if (orbitRef.current) orbitRef.current.enabled = false
           drag.current = {

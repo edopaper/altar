@@ -53,6 +53,12 @@ input { accent-color: var(--ofrenda-gold); }
 .btn--active { background: #f5b85c26; border-color: var(--ofrenda-gold); }
 .btn--danger { color: #f4a8ad; background: #ed77850a; border-color: #ed778538; }
 .btn--danger:hover:not(:disabled) { background: #ed778520; border-color: #ed778580; }
+.btn--sm { min-height: 32px; padding: 6px 5px; font-size: 11px; }
+.draft-state, .publish-state { color: var(--ofrenda-muted); }
+.draft-state--ok { color: #9fd2a8; }
+.draft-state--error { color: #f4a8ad; }
+.draft-state--warn { color: var(--ofrenda-gold); }
+.arrange-axis { color: var(--ofrenda-muted); }
 .decor-search, .rename-input, .message-input, .message-textarea, .publish-link-input { min-height: 42px; padding: 11px 12px; border-radius: 10px; background: #110d1790; border-color: #b9a7bb40; color: var(--ofrenda-text); }
 .decor-search { margin: 10px 0 12px; }
 .decor-search::placeholder { color: var(--ofrenda-muted); font-size: 12px; }

@@ -66,6 +66,56 @@ como prioridad.
       No se persiste "sonando": los navegadores bloquean el autoplay sin
       gesto del usuario, así que igual hay que tocar play de nuevo.
 
+### 15. Alinear y distribuir objetos (acomodo con precisión)
+- [x] `src/arrange.js`: funciones puras sobre `position` (alinear a un
+      borde/centro, distribuir con la misma separación, ajustar a la
+      rejilla) + `GRID_STEP`, que ahora comparten el snap del gizmo
+      (`AltarObject.jsx`, `GroupTransformControls` en `AltarScene.jsx`) y el
+      acomodo del menú, para que arrastrar y acomodar caigan en los mismos
+      puntos.
+- [x] Panel "N seleccionados" (`AltarMenu.jsx`): filas de alinear por eje
+      con etiquetas del altar (a lo ancho / en profundidad / en altura, no
+      x/y/z), distribuir por eje y "Ajustar a la rejilla". Alinear pide 2
+      objetos desbloqueados y distribuir 3; los bloqueados no se mueven ni
+      cuentan como referencia.
+- [x] "Ajustar a la rejilla" también en el panel de un solo objeto.
+- [x] Todo pasa por `pushHistory()`, así que Ctrl+Z deshace un acomodo
+      completo en un solo paso.
+- [x] `tests/arrange.test.mjs` cubre centro del rango (no promedio), orden
+      por posición al distribuir, extremos fijos y redondeo sin ruido de
+      coma flotante.
+
+### 16. Simplificar el estado del borrador (se guarda solo)
+Problema: el panel del nombre mostraba cuatro mensajes que se pisaban entre
+sí ("Cambios pendientes de sincronizar", "Borrador privado…", el error
+"Inicia sesión…" con un "Reintentar" que sin sesión nunca iba a funcionar) y
+dos botones parecidos, "Guardar borrador" y "Publicar altar".
+- [x] `draftStatus()` en `draftState.js`: una sola línea de estado resuelta
+      por prioridad (fallo local > error de la nube > sin sesión > sin
+      conexión > guardando > guardado con hora). El "Reintentar" solo
+      aparece cuando puede servir.
+- [x] El altar se guarda solo también la primera vez: `useCloudDraft` crea la
+      fila en la cuenta tras 2.5 s de calma (10 s para sincronizar una ya
+      existente) y desapareció el botón "Guardar borrador".
+- [x] `hasContent()` evita crear un altar vacío por solo abrir el editor: sin
+      esa guarda, entrar con sesión gastaba uno de los 3 espacios por cuenta.
+- [x] La visibilidad quedó en su propio renglón ("Sin publicar. Por ahora
+      solo tú lo ves." / "Publicado…") junto al único botón de acción,
+      "Publicar altar", ahora primario.
+- [x] El mismo mensaje se reusa en el aviso flotante (menú cerrado) y en la
+      nota del menú, que antes contaban historias distintas.
+- [x] Publicar avisa con un toast si `save()` no pudo (antes, si un
+      autoguardado tenía el candado, el botón parecía no hacer nada).
+- [x] `tests/draft-status.test.mjs` cubre la prioridad de los mensajes y la
+      guarda del altar vacío.
+- [x] Publicar sin sesión ya no falla al final del camino: `requestShare`
+      abre antes un aviso ("Publicar necesita tu cuenta") con el botón de
+      entrar con Google, en vez de dejar pasar por la captura previa para
+      recién ahí mostrar un error. `startGoogleLogin()` salió de
+      `UserAccount.jsx` a `auth.js` para poder llamarlo desde el editor;
+      recibe el cliente por parámetro para no arrastrar `supabaseClient.js`
+      (y sus variables de Vite) a los tests.
+
 ## Prioridad baja / nice-to-have
 
 ### 9. Preview antes de compartir

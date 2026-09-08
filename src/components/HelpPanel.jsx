@@ -19,7 +19,7 @@ const SECTIONS = [
       'A la izquierda está el menú: tus objetos, el catálogo de decoración, la foto y el mantel.',
       'Arrastrá sobre la escena para girar la cámara; la rueda (o pellizco) acerca y aleja.',
       'Los botones flotantes de la derecha: compartir, capturar imagen y la música.',
-      'Todo se guarda solo en este navegador: podés cerrar y seguir después.',
+      'Todo se guarda solo: en este navegador siempre, y en tu cuenta si entraste con Google. No hay botón de guardar; "Publicar" es otra cosa: es lo que genera el enlace público.',
     ],
   },
   {
@@ -46,6 +46,7 @@ const SECTIONS = [
       'Cambiá de modo con la barra de arriba o el panel "Seleccionado": Mover, Rotar o Escalar.',
       'Desde el panel también podés renombrar, duplicar o eliminar; el candado de la lista bloquea un objeto para no moverlo por accidente.',
       'Shift+click suma objetos a la selección para moverlos o duplicarlos en grupo.',
+      'Con varios seleccionados podés alinearlos (a un mismo borde o al centro) y distribuirlos con la misma separación; "Ajustar a la rejilla" los acomoda a puntos exactos.',
       '¿Algo salió mal? Ctrl+Z lo deshace (también hay botones ↶/↷ en la barra).',
     ],
   },

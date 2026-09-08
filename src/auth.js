@@ -43,3 +43,25 @@ export function getLoginErrorMessage(error) {
   }
   return 'No se pudo iniciar sesión con Google. Revisa tu conexión e inténtalo de nuevo.'
 }
+
+// Arranca el login con Google desde cualquier pantalla (el panel de cuenta o
+// el aviso de "entra para publicar"). Deja a salvo el borrador de invitado,
+// que de otro modo se perdería en el redirect de OAuth, y recuerda la ruta a
+// la que volver. `client` se recibe por parámetro para que este módulo siga
+// sin depender de supabaseClient.js (que necesita las variables de Vite y no
+// se puede importar desde los tests). Lanza si el proveedor falla: quien
+// llama decide cómo mostrarlo con getLoginErrorMessage().
+export async function startGoogleLogin(client, { local, session } = {}) {
+  try {
+    local ??= window.localStorage
+    session ??= window.sessionStorage
+    const guest = local.getItem('workspace-v2')
+    if (guest && (!window.location.hash || window.location.hash === '#/')) session.setItem('altar-login-draft', guest)
+  } catch { /* sin borrador de invitado que preservar */ }
+  rememberLoginRoute(USER_LOGIN_REDIRECT_KEY, window.location.hash || '#/', session)
+  const { error } = await client.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: `${window.location.origin}${window.location.pathname}` },
+  })
+  if (error) throw error
+}

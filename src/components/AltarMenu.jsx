@@ -67,6 +67,75 @@ function RenameField({ id, name, onRename }) {
   )
 }
 
+// Ejes tal como se ven desde la cámara por defecto: X a lo ancho del altar,
+// Y la altura sobre las gradas, Z la profundidad (el frente es hacia quien
+// mira). Las etiquetas hablan de eso, no de "x/y/z", que a quien arma un
+// altar no le dice nada.
+const ALIGN_AXES = [
+  { axis: 'x', label: 'A lo ancho', edges: [['min', 'Izquierda'], ['center', 'Centro'], ['max', 'Derecha']] },
+  { axis: 'z', label: 'En profundidad', edges: [['min', 'Atrás'], ['center', 'Centro'], ['max', 'Frente']] },
+  { axis: 'y', label: 'En altura', edges: [['min', 'Abajo'], ['center', 'Centro'], ['max', 'Arriba']] },
+]
+
+const DISTRIBUTE_AXES = [
+  { axis: 'x', label: 'A lo ancho' },
+  { axis: 'z', label: 'En profundidad' },
+  { axis: 'y', label: 'En altura' },
+]
+
+/**
+ * Acomodo en lote de la selección: alinear sobre un eje, repartir con la
+ * misma separación y ajustar a la rejilla. `movable` es cuántos objetos
+ * seleccionados están desbloqueados: alinear necesita 2 y distribuir 3.
+ */
+function ArrangeControls({ movable, onAlign, onDistribute, onSnapToGrid }) {
+  const canAlign = movable >= 2
+  const canDistribute = movable >= 3
+  return (
+    <div className="arrange">
+      <div className="menu-label">Alinear</div>
+      {ALIGN_AXES.map(({ axis, label, edges }) => (
+        <div key={axis} className="arrange-row">
+          <span className="arrange-axis">{label}</span>
+          {edges.map(([edge, edgeLabel]) => (
+            <button
+              key={edge}
+              className="btn btn--sm"
+              onClick={() => onAlign(axis, edge)}
+              disabled={!canAlign}
+              title={canAlign ? `Alinear ${label.toLowerCase()}: ${edgeLabel.toLowerCase()}` : 'Selecciona al menos 2 objetos desbloqueados'}
+            >
+              {edgeLabel}
+            </button>
+          ))}
+        </div>
+      ))}
+      <div className="menu-label">Distribuir</div>
+      <div className="arrange-row arrange-row--even">
+        {DISTRIBUTE_AXES.map(({ axis, label }) => (
+          <button
+            key={axis}
+            className="btn btn--sm"
+            onClick={() => onDistribute(axis)}
+            disabled={!canDistribute}
+            title={canDistribute ? `Misma separación ${label.toLowerCase()}, dejando los extremos donde están` : 'Selecciona al menos 3 objetos desbloqueados'}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <button
+        className="btn btn--block btn--sm"
+        onClick={onSnapToGrid}
+        disabled={movable === 0}
+        title="Lleva cada objeto al punto más cercano de la rejilla"
+      >
+        Ajustar a la rejilla
+      </button>
+    </div>
+  )
+}
+
 export default function AltarMenu({
   categories,
   objects,
@@ -86,6 +155,9 @@ export default function AltarMenu({
   onDelete,
   onDuplicateSelected,
   onDeleteSelected,
+  onAlignSelected,
+  onDistributeSelected,
+  onSnapSelectedToGrid,
   onRename,
   onToggleSnap,
   onClearAltar,
@@ -97,7 +169,8 @@ export default function AltarMenu({
   clothColor,
   onClothColorChange,
   onHide,
-  draft,
+  draftState,
+  onRetryLocalSave,
   maxObjects,
   objectsWarningAt,
   tribute,
@@ -105,6 +178,9 @@ export default function AltarMenu({
   onShowAbout,
   onShowHelp,
 }) {
+  // Alinear/distribuir/ajustar solo mueve lo desbloqueado, así que los
+  // botones se habilitan contra ese subconjunto y no contra la selección.
+  const movableSelected = selectedObjects.filter((o) => !o.locked)
   const [decorQuery, setDecorQuery] = useState('')
   // Chip de categoría activo: 'all' muestra todo el catálogo agrupado.
   const [activeGroup, setActiveGroup] = useState('all')
@@ -238,8 +314,16 @@ export default function AltarMenu({
         <section className="menu-section menu-section--active">
           <h2>{selectedIds.length} seleccionados</h2>
           <div className="menu-note">
-            Arrastra el gizmo en la escena para moverlos juntos, manteniendo sus posiciones relativas.
+            Arrastra el gizmo en la escena para moverlos juntos, manteniendo sus posiciones relativas,
+            o acomódalos con precisión: alinear los lleva a un mismo borde y distribuir los reparte con
+            la misma separación.
           </div>
+          <ArrangeControls
+            movable={movableSelected.length}
+            onAlign={onAlignSelected}
+            onDistribute={onDistributeSelected}
+            onSnapToGrid={onSnapSelectedToGrid}
+          />
           <div className="shape-row">
             <button className="btn" onClick={onDuplicateSelected}>Duplicar todos</button>
             <button
@@ -280,6 +364,14 @@ export default function AltarMenu({
               Eliminar
             </button>
           </div>
+          <button
+            className="btn btn--block btn--sm"
+            onClick={onSnapSelectedToGrid}
+            disabled={selected.locked}
+            title="Lleva el objeto al punto más cercano de la rejilla"
+          >
+            Ajustar a la rejilla
+          </button>
           {selected.locked && (
             <div className="menu-note">Objeto bloqueado: desbloquéalo con el candado para editarlo.</div>
           )}
@@ -415,9 +507,9 @@ export default function AltarMenu({
         <button className="btn btn--danger btn--block" onClick={onClearAltar} disabled={objects.length === 0}>
           Limpiar altar
         </button>
-        <div className="menu-note" role="status">
-          {draft?.status === 'saving' ? 'Guardando…' : draft?.status === 'error' ? 'No se pudo guardar en este navegador' : 'Guardado en este navegador'}
-          {draft?.status === 'error' && <button className="btn" onClick={draft.retry}>Reintentar</button>}
+        <div className={`menu-note draft-state--${draftState?.tone ?? 'info'}`} role="status">
+          {draftState?.text}
+          {draftState?.retry === 'local' && <button className="btn btn--sm" onClick={onRetryLocalSave}>Reintentar</button>}
         </div>
         <QualityControls />
       </section>

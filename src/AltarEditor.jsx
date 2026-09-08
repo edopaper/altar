@@ -1,9 +1,12 @@
 import { QualityControls } from './QualityContext.jsx'
 import { readLocal, writeLocal } from './localStore.js'
 import useCloudDraft from './useCloudDraft.js'
-import { restoreDraft } from './draftState.js'
+import { restoreDraft, draftStatus } from './draftState.js'
+import { startGoogleLogin, getLoginErrorMessage } from './auth.js'
+import { supabase } from './supabaseClient.js'
 import { TEMPLATES, createTemplate } from './templates.js'
 import { configuredScaleVector } from './modelScale.js'
+import { alignPositions, distributePositions, snapPositionsToGrid } from './arrange.js'
 import Modal from './components/Modal.jsx'
 import { restoreScene, isColor } from '../supabase/functions/_shared/scene-validation.js'
 import { cleanTribute } from '../supabase/functions/_shared/tribute.js'
@@ -221,6 +224,8 @@ export default function AltarEditor({ initialAltar = null, draftPrefix = '' }) {
   // Captura (data URL) mostrada en el modal de confirmación previo a
   // compartir: null mientras está cerrado.
   const [sharePreview, setSharePreview] = useState(null)
+  // Aviso previo al login cuando alguien sin sesión intenta publicar.
+  const [loginPrompt, setLoginPrompt] = useState(null)
   const [toast, setToast] = useState(null)
   const toastTimerRef = useRef(null)
   const showToast = useCallback((message, type = 'info', duration = 5000, action = null) => {
@@ -251,7 +256,13 @@ export default function AltarEditor({ initialAltar = null, draftPrefix = '' }) {
   const content = { objects, photo, clothColor, name: altarName, tribute }
   const cloud = useCloudDraft(content, applyContent, workspace, draftPrefix)
   const isSharing = cloud.busy
-  const draft = { status: cloud.localError ? 'error' : 'saved', retry: cloud.retryLocal }
+  // Único mensaje de guardado (ver draftStatus): lo comparten el panel del
+  // nombre, el aviso flotante con el menú cerrado y la nota del menú, para
+  // que no vuelvan a contar tres historias distintas a la vez.
+  const draftState = draftStatus({
+    managed: cloud.managed, online: cloud.online, busy: cloud.busy, dirty: cloud.dirty,
+    error: cloud.error, localError: cloud.localError, updatedAt: cloud.updated_at,
+  })
   const useTemplate = (id) => {
     const next = createTemplate(id)
     if (objects.length || photo) {
@@ -318,12 +329,35 @@ export default function AltarEditor({ initialAltar = null, draftPrefix = '' }) {
   // a shareAltar (y por lo tanto a la Edge Function).
   const requestShare = () => {
     if (isSharing) return
+    // Publicar necesita cuenta (la Edge Function exige sesión). Sin ella se
+    // pide el login acá, antes de la captura: dejar seguir hasta el final y
+    // recién ahí fallar era el camino confuso que había.
+    if (!cloud.managed) {
+      setLoginPrompt({ error: '' })
+      return
+    }
     withCleanCanvas((canvas) => setSharePreview(canvas.toDataURL('image/jpeg', 0.8)))
+  }
+
+  // Aviso "entra para publicar": null mientras está cerrado.
+  const goToLogin = async () => {
+    setLoginPrompt({ error: '', busy: true })
+    try {
+      await startGoogleLogin(supabase)
+    } catch (err) {
+      setLoginPrompt({ error: getLoginErrorMessage(err), busy: false })
+    }
   }
 
   const shareAltar = async () => {
     const result = await cloud.save(true)
-    if (!result) return
+    // save() devuelve null si falló (el mensaje queda en el panel) o si un
+    // autoguardado tenía tomado el candado justo en ese momento: sin este
+    // aviso, publicar parecía no hacer nada.
+    if (!result) {
+      showToast(cloud.error || 'No se pudo publicar ahora. Espera un momento y vuelve a intentarlo.', 'error')
+      return
+    }
     const url = `${window.location.origin}${window.location.pathname}#/ver/${result.slug}`
     copyToClipboard(url)
     setShareInfo({ url, note: result.updated ? 'Versión publicada. El enlace sigue siendo el mismo.' : 'Tu altar ya está publicado.' })
@@ -523,6 +557,19 @@ export default function AltarEditor({ initialAltar = null, draftPrefix = '' }) {
     markJustAdded(copies[copies.length - 1].id)
   }
 
+  // Acomodo en lote (alinear / distribuir / ajustar a la rejilla): las
+  // funciones de arrange.js calculan las posiciones nuevas y acá solo se
+  // aplican. Los objetos bloqueados quedan fuera, igual que en el resto de
+  // las acciones en lote, así que tampoco cuentan como referencia.
+  const arrangeSelected = (compute) => {
+    const movable = objects.filter((o) => selectedIds.includes(o.id) && !o.locked)
+    if (movable.length === 0) return
+    const moves = compute(movable)
+    if (moves.size === 0) return
+    pushHistory()
+    setObjects((prev) => prev.map((o) => (moves.has(o.id) ? { ...o, position: moves.get(o.id) } : o)))
+  }
+
   const renameObject = (id, name) => {
     pushHistory()
     setObjects((prev) => prev.map((o) => (o.id === id ? { ...o, name } : o)))
@@ -594,19 +641,27 @@ export default function AltarEditor({ initialAltar = null, draftPrefix = '' }) {
         </button>
         <div id="altar-name-panel" className="altar-name-panel" hidden={!namePanelOpen}>
           <label htmlFor="altar-name">Nombre de tu altar</label>
-          <div className="shape-row"><input id="altar-name" maxLength={120} value={altarName} onChange={e => setAltarName(e.target.value)} />
-          <button className="btn btn--primary" disabled={isSharing || !!cloud.conflict} onClick={() => cloud.save(false)}>{isSharing ? 'Guardando…' : 'Guardar borrador'}</button></div>
-          <p role="status">{!cloud.online ? 'Sin conexión. Tus cambios se conservan en este navegador.' : cloud.busy ? 'Sincronizando…' : cloud.dirty ? 'Cambios pendientes de sincronizar' : 'Sincronizado con tu cuenta'}{cloud.updated_at && ` · Última sincronización: ${new Date(cloud.updated_at).toLocaleString('es-MX')}`}</p>
-          <span>{cloud.is_published ? 'Los cambios del borrador solo aparecen en el enlace al publicar.' : 'Borrador privado. Solo será visible cuando lo publiques.'}</span>
-          <div className="shape-row"><button className="btn" disabled={isSharing || !!cloud.conflict} onClick={requestShare}>{cloud.is_published ? 'Publicar cambios' : 'Publicar altar'}</button><button className="btn" onClick={() => setTemplatesOpen(true)}>Plantillas</button></div>
-          {cloud.error && <p role="alert">{cloud.error} <button className="btn" disabled={isSharing || !!cloud.conflict} onClick={() => cloud.save(false)}>Reintentar</button></p>}
-          {cloud.localError && <p role="alert">No se pudo guardar la copia local. <button className="btn" onClick={cloud.retryLocal}>Reintentar</button></p>}
+          <input id="altar-name" maxLength={120} value={altarName} onChange={e => setAltarName(e.target.value)} />
+          {/* Un solo renglón de estado del guardado (draftStatus) y otro,
+              aparte, de visibilidad: se guarda solo, y publicar es la única
+              decisión que queda en manos de quien arma el altar. */}
+          <p className={`draft-state draft-state--${draftState.tone}`} role={draftState.tone === 'error' ? 'alert' : 'status'}>
+            {draftState.text}
+            {draftState.retry === 'cloud' && <button className="btn btn--sm" disabled={isSharing || !!cloud.conflict} onClick={() => cloud.save(false)}>Reintentar</button>}
+            {draftState.retry === 'local' && <button className="btn btn--sm" onClick={cloud.retryLocal}>Reintentar</button>}
+          </p>
+          <p className="publish-state">
+            {cloud.is_published
+              ? 'Publicado. Los cambios aparecen en el enlace cuando vuelves a publicar.'
+              : 'Sin publicar. Por ahora solo tú lo ves.'}
+          </p>
+          <div className="shape-row"><button className="btn btn--primary" disabled={isSharing || !!cloud.conflict} onClick={requestShare}>{cloud.is_published ? 'Publicar cambios' : 'Publicar altar'}</button><button className="btn" onClick={() => setTemplatesOpen(true)}>Plantillas</button></div>
           {readLocal(draftPrefix + 'recovery-v2') && <button className="menu-about-link" onClick={cloud.restoreRecovery}>Recuperar copia anterior</button>}
         </div>
       </div>
-      {!menuOpen && <div className="draft-status" role="status">
-        {draft.status === 'saving' ? 'Guardando…' : draft.status === 'saved' ? 'Guardado en este navegador' : 'No se pudo guardar en este navegador'}
-        {draft.status === 'error' && <button className="btn" onClick={draft.retry}>Reintentar</button>}
+      {!menuOpen && <div className={`draft-status draft-state--${draftState.tone}`} role="status">
+        {draftState.text}
+        {draftState.retry === 'local' && <button className="btn btn--sm" onClick={cloud.retryLocal}>Reintentar</button>}
       </div>}
       {cloud.conflict && <Modal label="Cambios en otro dispositivo" className="message-form" onClose={() => {}}>
         <h2>Hay dos versiones de tu altar</h2>
@@ -616,6 +671,16 @@ export default function AltarEditor({ initialAltar = null, draftPrefix = '' }) {
         <button className="btn btn--primary" onClick={() => cloud.resolve(false)}>Usar versión de mi cuenta</button>
         <button className="btn" onClick={() => cloud.resolve(true)}>Conservar mis cambios locales</button>
         <p>Si eliges la versión de tu cuenta, podrás recuperar tu copia local desde «Recuperar copia anterior».</p>
+      </Modal>}
+      {loginPrompt && <Modal label="Entra para publicar" className="message-form" onClose={() => setLoginPrompt(null)}>
+        <h2>Publicar necesita tu cuenta</h2>
+        <p>El enlace público vive en tu cuenta: desde ahí puedes actualizar el altar sin cambiar el enlace, o darlo de baja cuando quieras.</p>
+        <p>Tu altar no se pierde: lo que armaste hasta ahora viaja contigo al volver del login.</p>
+        {loginPrompt.error && <p role="alert">{loginPrompt.error}</p>}
+        <button className="btn btn--primary" onClick={goToLogin} disabled={loginPrompt.busy}>
+          {loginPrompt.busy ? 'Abriendo…' : 'Entrar con Google'}
+        </button>
+        <button className="btn" onClick={() => setLoginPrompt(null)}>Seguir sin publicar</button>
       </Modal>}
       {templatesOpen && <Modal label="Elegir plantilla" className="message-form template-picker" onClose={() => setTemplatesOpen(false)}>
         <h2>Un punto de partida para tu homenaje</h2>
@@ -686,6 +751,9 @@ export default function AltarEditor({ initialAltar = null, draftPrefix = '' }) {
         onColorChange={(color) => selected && updateObject(selected.id, { color })}
         onDuplicate={() => selected && duplicateObject(selected.id)}
         onDelete={() => selected && removeObject(selected.id)}
+        onAlignSelected={(axis, edge) => arrangeSelected((sel) => alignPositions(sel, axis, edge))}
+        onDistributeSelected={(axis) => arrangeSelected((sel) => distributePositions(sel, axis))}
+        onSnapSelectedToGrid={() => arrangeSelected((sel) => snapPositionsToGrid(sel))}
         onDuplicateSelected={duplicateSelected}
         onDeleteSelected={removeSelected}
         onRename={renameObject}
@@ -699,7 +767,8 @@ export default function AltarEditor({ initialAltar = null, draftPrefix = '' }) {
         onClothColorChange={setClothColor}
         mode={mode}
         onModeChange={setMode}
-        draft={draft}
+        draftState={draftState}
+        onRetryLocalSave={cloud.retryLocal}
         maxObjects={MAX_OBJECTS}
         objectsWarningAt={OBJECTS_WARNING_THRESHOLD}
         tribute={tribute}

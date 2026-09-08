@@ -24,3 +24,27 @@ test('el error indica cuando falta habilitar Google', () => {
   assert.match(getLoginErrorMessage({ message: 'Unsupported provider: provider is not enabled' }), /habilitado/)
   assert.match(getLoginErrorMessage(new Error('network')), /conexión/)
 })
+
+test('entrar con Google desde el editor deja a salvo el borrador de invitado y la ruta de vuelta', async () => {
+  const { startGoogleLogin } = await import('../src/auth.js')
+  const local = memory()
+  const session = memory()
+  local.setItem('workspace-v2', '{"content":{"objects":[1]}}')
+  globalThis.window = { location: { hash: '', origin: 'https://altar.test', pathname: '/' } }
+  const calls = []
+  const client = { auth: { signInWithOAuth: async (opts) => { calls.push(opts); return { error: null } } } }
+  await startGoogleLogin(client, { local, session })
+  assert.equal(session.getItem('altar-login-draft'), '{"content":{"objects":[1]}}')
+  assert.equal(consumeLoginRoute(session), '#/')
+  assert.equal(calls[0].options.redirectTo, 'https://altar.test/')
+})
+
+test('si el proveedor falla, entrar con Google lanza para que la pantalla lo muestre', async () => {
+  const { startGoogleLogin } = await import('../src/auth.js')
+  globalThis.window = { location: { hash: '#/', origin: 'https://altar.test', pathname: '/' } }
+  const client = { auth: { signInWithOAuth: async () => ({ error: new Error('Unsupported provider') }) } }
+  await assert.rejects(
+    () => startGoogleLogin(client, { local: memory(), session: memory() }),
+    (err) => getLoginErrorMessage(err).includes('Google aún no está habilitado'),
+  )
+})

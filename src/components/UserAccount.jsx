@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getUserAvatar, getUserDisplayName, getLoginErrorMessage, rememberLoginRoute, USER_LOGIN_REDIRECT_KEY } from '../auth.js'
+import { getUserAvatar, getUserDisplayName, getLoginErrorMessage, startGoogleLogin } from '../auth.js'
 import { supabase } from '../supabaseClient.js'
 
 export default function UserAccount({ compact = false }) {
@@ -33,16 +33,7 @@ export default function UserAccount({ compact = false }) {
     setBusy(true)
     setError('')
     try {
-      const guest = localStorage.getItem('workspace-v2')
-      if (guest && (!window.location.hash || window.location.hash === '#/')) sessionStorage.setItem('altar-login-draft', guest)
-    } catch {}
-    rememberLoginRoute(USER_LOGIN_REDIRECT_KEY, window.location.hash || '#/')
-    try {
-      const { error: loginError } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: `${window.location.origin}${window.location.pathname}` },
-      })
-      if (loginError) throw loginError
+      await startGoogleLogin(supabase)
     } catch (loginError) {
       setBusy(false)
       setError(getLoginErrorMessage(loginError))
