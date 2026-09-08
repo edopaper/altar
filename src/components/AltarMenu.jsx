@@ -1,5 +1,6 @@
 import { QualityControls } from '../QualityContext.jsx'
 import { useEffect, useState } from 'react'
+import { TRIBUTE_LIMITS } from '../../supabase/functions/_shared/tribute.js'
 
 const SHAPES = [
   { kind: 'cube', label: 'Cubo' },
@@ -99,6 +100,8 @@ export default function AltarMenu({
   draft,
   maxObjects,
   objectsWarningAt,
+  tribute,
+  onEditTribute,
   onShowAbout,
   onShowHelp,
 }) {
@@ -369,6 +372,31 @@ export default function AltarMenu({
           )}
         </div>
         <div className="menu-note">Un rostro para recordar. Sube una foto de hasta 5 MB.</div>
+      </section>
+
+      <section className="menu-section">
+        <h2>Dedicatoria</h2>
+        {tribute ? (
+          <div className="tribute-summary">
+            <p className="tribute-summary-name">{tribute.personName || 'Sin nombre'}</p>
+            {(tribute.birth || tribute.death) && (
+              <p className="tribute-summary-dates">
+                {[tribute.birth, tribute.death].filter(Boolean).join(' — ')}
+              </p>
+            )}
+            <p className="menu-note">
+              {tribute.bio ? 'Biografía escrita' : 'Sin biografía'} ·{' '}
+              {tribute.memories.length}/{TRIBUTE_LIMITS.memories} recuerdos
+            </p>
+          </div>
+        ) : (
+          <div className="menu-note">
+            Cuenta quién fue: su nombre, sus fechas y los recuerdos que quieras dejar junto a la fotografía.
+          </div>
+        )}
+        <button className="btn btn--block" onClick={onEditTribute}>
+          {tribute ? 'Editar dedicatoria' : 'Escribir dedicatoria'}
+        </button>
       </section>
 
       <section className="menu-section">

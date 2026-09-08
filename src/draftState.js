@@ -1,10 +1,12 @@
 import { restoreScene } from '../supabase/functions/_shared/scene-validation.js'
-export const contentOf = (altar) => ({ objects: altar?.objects ?? [], photo: altar?.photo_url ?? null, clothColor: altar?.cloth_color ?? '#f7f2e8', name: altar?.name ?? 'Mi altar' })
+import { cleanTribute } from '../supabase/functions/_shared/tribute.js'
+export const contentOf = (altar) => ({ objects: altar?.objects ?? [], photo: altar?.photo_url ?? null, clothColor: altar?.cloth_color ?? '#f7f2e8', name: altar?.name ?? 'Mi altar', tribute: cleanTribute(altar?.tribute) })
 // Compare persisted fields, not incidental key ordering, unused shape fields,
 // or the optional `locked` default inserted when restoring a scene.
 export const fingerprint = (content) => JSON.stringify({
   name: content.name?.trim() || 'Mi altar', objects: restoreScene(content.objects),
   photo: content.photo ?? null, clothColor: content.clothColor ?? '#f7f2e8',
+  tribute: cleanTribute(content.tribute),
 })
 export function restoreDraft(remote, stored) {
   const server = contentOf(remote)

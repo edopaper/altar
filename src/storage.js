@@ -1,4 +1,5 @@
 import { isValidScene } from '../supabase/functions/_shared/scene-validation.js'
+import { cleanTribute } from '../supabase/functions/_shared/tribute.js'
 // Guardado/lectura de altares compartidos, respaldado por Supabase.
 // Compartir exige sesión y pasa por share-altar. La base de datos limita
 // cada cuenta a tres altares; los enlaces públicos siguen siendo legibles.
@@ -46,7 +47,7 @@ async function invokeShareAltar(body) {
   return data
 }
 
-export async function saveSharedAltar({ objects, photo, name, clothColor, slug, managed = false, revision = 0, action = 'publish', expectedUserId, editToken, draftId }) {
+export async function saveSharedAltar({ objects, photo, name, clothColor, tribute, slug, managed = false, revision = 0, action = 'publish', expectedUserId, editToken, draftId }) {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) throw new Error('Inicia sesión para guardar tus altares.')
   if (expectedUserId && session.user.id !== expectedUserId) throw new Error('La cuenta cambió. Vuelve a abrir tu altar.')
@@ -59,7 +60,7 @@ export async function saveSharedAltar({ objects, photo, name, clothColor, slug, 
     throw new Error('No se pudo verificar el guardado privado. Revisa tu conexión o actualiza el servidor. Tu copia local se conserva.')
   }
   const editInfo = managed ? null : loadEditInfo(session.user.id)
-  const body = { objects, photo, name, clothColor, revision, action, ...(!slug && draftId ? { draftId } : {}) }
+  const body = { objects, photo, name, clothColor, tribute, revision, action, ...(!slug && draftId ? { draftId } : {}) }
   if (slug) { body.slug = slug; if (editToken) body.editToken = editToken }
   else if (editInfo) Object.assign(body, editInfo)
   const data = await invokeShareAltar(body)
@@ -101,7 +102,7 @@ export async function reportAltar(slug) {
 export async function loadSharedAltar(slug) {
   const { data, error } = await supabase
     .from('altars')
-    .select('slug, name, objects, photo_url, cloth_color, status, created_at')
+    .select('slug, name, objects, photo_url, cloth_color, tribute, status, created_at')
     .eq('slug', slug)
     .maybeSingle()
 
@@ -116,6 +117,7 @@ export async function loadSharedAltar(slug) {
     objects: data.objects,
     photo: data.photo_url,
     clothColor: data.cloth_color,
+    tribute: cleanTribute(data.tribute),
     status: data.status,
   }
 }

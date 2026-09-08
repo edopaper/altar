@@ -167,3 +167,23 @@ test('una foto de una publicación anterior devuelve conflicto antes de validarl
   existingOwner = null
   storedRevision = 0
 })
+test('la API valida y modera la dedicatoria antes de guardarla', async () => {
+  const before = clientCalls
+  for (const tribute of [[], { personName: 'a'.repeat(81) }, { memories: [{ text: 'x' }, { text: 'x' }, { text: 'x' }, { text: 'x' }, { text: 'x' }, { text: 'x' }, { text: 'x' }] }]) {
+    assert.equal((await handler(request({ objects: [], tribute }))).status, 400, JSON.stringify(tribute))
+  }
+  assert.equal(clientCalls, before)
+  for (const tribute of [{ personName: 'Idiota' }, { bio: 'Era un imbécil' }, { memories: [{ text: 'pendejo' }] }]) {
+    assert.equal((await handler(request({ objects: [], tribute }))).status, 400, JSON.stringify(tribute))
+  }
+})
+test('la dedicatoria se guarda limpia y una vacía no ocupa lugar', async () => {
+  let result = await handler(request({ objects: [], tribute: { personName: '  Ana  ', death: '2021', extra: 'x', memories: [{ text: ' Cantaba ' }, { text: '  ' }] } }))
+  assert.equal(result.status, 200)
+  assert.deepEqual(writes.at(-1).tribute, { personName: 'Ana', birth: '', death: '2021', bio: '', memories: [{ id: 1, text: 'Cantaba' }] })
+  result = await handler(request({ objects: [], tribute: { personName: '   ', memories: [] } }))
+  assert.equal(result.status, 200)
+  assert.equal(writes.at(-1).tribute, null)
+  assert.equal((await handler(request({ objects: [] }))).status, 200)
+  assert.equal(writes.at(-1).tribute, null)
+})

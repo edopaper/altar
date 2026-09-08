@@ -222,41 +222,22 @@ function CeremonialLights() {
 
 // Órbita automática del visor: sin actividad, la cámara oscila lentamente
 // como péndulo alrededor del altar, sin pasar de ±45° (nunca ve las paredes
-// por detrás). Cualquier interacción la pausa unos segundos.
+// por detrás). Arranca exactamente cuando el visor oculta su interfaz (mismo
+// `idle` que AltarViewer.jsx usa para desvanecer la barra de botones) y se
+// detiene apenas alguien interactúa y la interfaz vuelve a aparecer.
 const ORBIT_LIMIT = Math.PI / 4
-const ORBIT_SPEED = 0.55 // autoRotateSpeed: lento, cozy
-const IDLE_DELAY_MS = 4000
+// autoRotateSpeed: cozy pero perceptible desde el primer vistazo (a 0.55 el
+// giro era tan sutil en los primeros segundos que parecía no estar pasando nada).
+const ORBIT_SPEED = 0.95
 
-function IdleOrbit({ orbitRef }) {
-  const idleRef = useRef(true)
+function IdleOrbit({ orbitRef, idle }) {
   const speedRef = useRef(ORBIT_SPEED)
-
-  useEffect(() => {
-    let timer
-    const wake = () => {
-      idleRef.current = false
-      clearTimeout(timer)
-      timer = setTimeout(() => {
-        idleRef.current = true
-      }, IDLE_DELAY_MS)
-    }
-    window.addEventListener('pointerdown', wake)
-    window.addEventListener('wheel', wake, { passive: true })
-    window.addEventListener('touchstart', wake, { passive: true })
-    return () => {
-      clearTimeout(timer)
-      window.removeEventListener('pointerdown', wake)
-      window.removeEventListener('wheel', wake)
-      window.removeEventListener('touchstart', wake)
-    }
-  }, [])
 
   useFrame((_, delta) => {
     const controls = orbitRef.current
     if (!controls) return
-    if (import.meta.env.DEV)
-      window.__orbitDebug = { azimuth: controls.getAzimuthalAngle(), idle: idleRef.current }
-    if (!idleRef.current) {
+    if (import.meta.env.DEV) window.__orbitDebug = { azimuth: controls.getAzimuthalAngle(), idle }
+    if (!idle) {
       controls.autoRotate = false
       return
     }
@@ -363,6 +344,10 @@ export default function AltarScene({
   onGroupDragEnd,
   focusRef,
   autoOrbit = false,
+  // Mismo booleano `idle` que decide si AltarViewer oculta su barra de
+  // botones: la órbita automática arranca exactamente cuando esa interfaz
+  // se desvanece, en vez de llevar su propio cronómetro de inactividad.
+  uiIdle = false,
   respectReducedMotionForAutoOrbit = true,
   messages = [],
   clothColor,
@@ -425,7 +410,7 @@ export default function AltarScene({
         />
       )}
 
-      {shouldAutoOrbit && <IdleOrbit orbitRef={orbitRef} />}
+      {shouldAutoOrbit && <IdleOrbit orbitRef={orbitRef} idle={uiIdle} />}
 
       <OrbitControls
         ref={orbitRef}

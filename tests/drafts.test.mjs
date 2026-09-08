@@ -45,3 +45,14 @@ test('recargar no inventa cambios por campos opcionales u orden de propiedades',
   const result = restoreDraft(null, { content: normalized, baseline: JSON.stringify(original), revision: 2 })
   assert.equal(fingerprint(result.content), result.baseline)
 })
+
+test('la dedicatoria viaja en el borrador sin marcar cambios falsos', () => {
+  const tribute = { personName: ' Ana ', birth: '1948', death: '', bio: '', memories: [{ id: 7, text: 'Cantaba' }, { text: '  ' }] }
+  const stored = { objects: [], photo: null, clothColor: '#ffffff', name: 'Mi altar', tribute }
+  const normalized = { ...stored, tribute: { personName: 'Ana', birth: '1948', death: '', bio: '', memories: [{ id: 1, text: 'Cantaba' }] } }
+  assert.equal(fingerprint(stored), fingerprint(normalized))
+  // Una dedicatoria vacía y una ausente son el mismo altar.
+  assert.equal(fingerprint({ ...stored, tribute: null }), fingerprint({ ...stored, tribute: { personName: '', memories: [] } }))
+  assert.deepEqual(contentOf({ ...remote, tribute }).tribute, normalized.tribute)
+  assert.equal(contentOf(remote).tribute, null)
+})

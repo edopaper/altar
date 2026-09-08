@@ -115,8 +115,11 @@ input { accent-color: var(--ofrenda-gold); }
   .toolbar-btn { min-height: 40px; padding: 8px 10px; }
   .account-panel { max-width: calc(100vw - 76px); }
   .draft-status { bottom: 78px; left: 12px; transform: none; max-width: calc(100vw - 90px); }
-  .viewer-bar { bottom: 82px; width: calc(100% - 90px); left: 12px; transform: none; flex-wrap: wrap; gap: 8px; padding: 12px; }
-  .viewer-title { width: 100%; }
+  .viewer-bar { bottom: 82px; width: calc(100% - 24px); max-width: calc(100% - 24px); left: 12px; transform: none; gap: 8px; padding: 12px; }
+  .viewer-bar-head { width: 100%; }
+  .viewer-title { max-width: 60vw; }
+  .viewer-bar-actions { width: 100%; }
+  .viewer-bar-actions .btn { flex: 1; }
   .message-form, .message-list-panel { padding: 22px; }
   .onboarding-form > h2 { font-size: 30px; }
   .onboarding-form { gap: 12px; }
@@ -166,3 +169,35 @@ input { accent-color: var(--ofrenda-gold); }
   .altar-name-control { top: auto; bottom: 12px; left: 12px; width: calc(100% - 24px); max-height: 32dvh; }
   .app--menu-open .menu-body { padding-bottom: 290px; }
 }
+
+/* Dedicatoria: mismo lenguaje que el altar (dorado cempasúchil sobre ciruela). */
+.tribute-editor, .tribute-panel {
+  padding: 28px;
+  border-radius: 22px;
+  background: linear-gradient(150deg, #3b2638, #211823 60%);
+  border: 1px solid var(--ofrenda-border);
+  box-shadow: 0 24px 100px #0008;
+}
+.tribute-editor h2, .tribute-panel h2 { font: 30px/1.2 Georgia, serif; color: #f7e5cf; letter-spacing: -.4px; }
+.tribute-panel h2 { font-size: 34px; }
+.tribute-intro, .tribute-field > span { color: var(--ofrenda-muted); }
+.tribute-field input, .tribute-field textarea {
+  min-height: 42px; padding: 11px 12px; border-radius: 10px;
+  background: #110d1790; border-color: #b9a7bb40; color: var(--ofrenda-text);
+}
+.tribute-field input::placeholder, .tribute-field textarea::placeholder { color: #b9a7bb80; }
+.tribute-counter { color: var(--ofrenda-muted); }
+.tribute-counter--full { color: #ffc670; }
+.tribute-summary-name { color: #f7e5cf; }
+.tribute-summary-dates { color: var(--ofrenda-gold); }
+.tribute-portrait { border: 1px solid #f5b85c55; background: #f5b85c0d; box-shadow: 0 10px 40px #09050b66; }
+.tribute-portrait span { font-size: 46px; color: var(--ofrenda-gold); }
+.tribute-dates-line { color: var(--ofrenda-gold); }
+.tribute-rule { color: #f5b85c66; }
+.tribute-bio { font: 15px/1.75 Georgia, serif; color: #e8dbe4; }
+.tribute-memory {
+  font: italic 14px/1.7 Georgia, serif; color: #efe1e9;
+  border: 1px solid var(--ofrenda-border); background: #f5b85c08;
+}
+.tribute-memory::before { content: '❝ '; color: var(--ofrenda-gold); font-style: normal; }
+.viewer-tribute-btn > span { color: var(--ofrenda-gold); }

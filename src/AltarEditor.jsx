@@ -6,6 +6,7 @@ import { TEMPLATES, createTemplate } from './templates.js'
 import { configuredScaleVector } from './modelScale.js'
 import Modal from './components/Modal.jsx'
 import { restoreScene, isColor } from '../supabase/functions/_shared/scene-validation.js'
+import { cleanTribute } from '../supabase/functions/_shared/tribute.js'
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import AltarScene from './components/AltarScene.jsx'
@@ -18,6 +19,7 @@ const AboutPanel = lazy(() => import('./components/AboutPanel.jsx'))
 const HelpPanel = lazy(() => import('./components/HelpPanel.jsx'))
 const Onboarding = lazy(() => import('./components/Onboarding.jsx'))
 const ShareModal = lazy(() => import('./components/ShareModal.jsx'))
+const TributeEditor = lazy(() => import('./components/TributeEditor.jsx'))
 const SharePreviewModal = lazy(() => import('./components/SharePreviewModal.jsx'))
 import Toast from './components/Toast.jsx'
 
@@ -230,19 +232,23 @@ export default function AltarEditor({ initialAltar = null, draftPrefix = '' }) {
 
   const [clothColor, setClothColor] = useState(workspace.content.clothColor ?? DEFAULT_CLOTH_COLOR)
   const [altarName, setAltarName] = useState(workspace.content.name)
+  // Dedicatoria: null mientras nadie escribió nada (ver tribute.js).
+  const [tribute, setTribute] = useState(() => cleanTribute(workspace.content.tribute))
+  const [tributeOpen, setTributeOpen] = useState(false)
   const applyContent = (value) => {
     setObjects(restoreScene(value.objects))
     nextId = Math.max(0, ...value.objects.map(o => o.id)) + 1
     setPhoto(value.photo)
     setClothColor(value.clothColor ?? DEFAULT_CLOTH_COLOR)
     setAltarName(value.name)
+    setTribute(cleanTribute(value.tribute))
     setSelectedIds([])
     historyRef.current = []
     futureRef.current = []
     setCanUndo(false)
     setCanRedo(false)
   }
-  const content = { objects, photo, clothColor, name: altarName }
+  const content = { objects, photo, clothColor, name: altarName, tribute }
   const cloud = useCloudDraft(content, applyContent, workspace, draftPrefix)
   const isSharing = cloud.busy
   const draft = { status: cloud.localError ? 'error' : 'saved', retry: cloud.retryLocal }
@@ -696,6 +702,8 @@ export default function AltarEditor({ initialAltar = null, draftPrefix = '' }) {
         draft={draft}
         maxObjects={MAX_OBJECTS}
         objectsWarningAt={OBJECTS_WARNING_THRESHOLD}
+        tribute={tribute}
+        onEditTribute={() => setTributeOpen(true)}
         onShowAbout={() => setAboutOpen(true)}
         onShowHelp={() => setHelpOpen(true)}
       />
@@ -725,6 +733,14 @@ export default function AltarEditor({ initialAltar = null, draftPrefix = '' }) {
             shareAltar()
           }}
           onClose={() => setSharePreview(null)}
+        />
+      )}
+      {tributeOpen && (
+        <TributeEditor
+          tribute={tribute}
+          photo={photo}
+          onSave={setTribute}
+          onClose={() => setTributeOpen(false)}
         />
       )}
       {photoCropSource && (

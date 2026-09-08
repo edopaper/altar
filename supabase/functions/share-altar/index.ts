@@ -17,6 +17,7 @@ const RATE_LIMIT = 5; // altares nuevos por IP
 const UPDATE_RATE_LIMIT = 30; // actualizaciones (mismo altar) por IP, más laxo
 const WINDOW_MS = 60 * 60 * 1000; // 1 hora
 import { isValidScene, cleanObject, isColor } from '../_shared/scene-validation.js';
+import { isValidTribute, cleanTribute, tributeTexts } from '../_shared/tribute.js';
 const PHOTO_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 
 
@@ -87,7 +88,7 @@ Deno.serve(async (req) => {
 
   if (payload?.action === 'capabilities') return json({ draftProtocol: 2 });
 
-  const { name, objects, clothColor, photo, slug: requestedSlug, editToken } = payload ?? {};
+  const { name, objects, clothColor, photo, tribute, slug: requestedSlug, editToken } = payload ?? {};
 
   if (!isValidScene(objects)) {
     return json({ error: "El altar tiene datos inválidos." }, 400);
@@ -104,6 +105,13 @@ Deno.serve(async (req) => {
   }
   if (typeof name === "string" && containsForbiddenWord(name)) {
     return json({ error: "El nombre del altar contiene una palabra no permitida." }, 400);
+  }
+  if (!isValidTribute(tribute)) {
+    return json({ error: "La dedicatoria tiene datos inválidos o demasiado largos." }, 400);
+  }
+  const cleanedTribute = cleanTribute(tribute);
+  if (tributeTexts(cleanedTribute).some(containsForbiddenWord)) {
+    return json({ error: "La dedicatoria contiene una palabra no permitida." }, 400);
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -181,7 +189,7 @@ Deno.serve(async (req) => {
   const newEditToken = (editToken as string) || crypto.randomUUID();
   const { data, error } = await supabase.rpc('commit_altar_draft', {
     p_slug: slug, p_user: userId, p_revision: revision,
-    p_content: { name: (name as string)?.trim() || 'Mi altar', objects: cleanObjects, photo: photo || null, clothColor: clothColor ?? null },
+    p_content: { name: (name as string)?.trim() || 'Mi altar', objects: cleanObjects, photo: photo || null, clothColor: clothColor ?? null, tribute: cleanedTribute },
     p_publish: action === 'publish', p_photo_url: photoUrl, p_edit_token: newEditToken,
   });
   if (error) {

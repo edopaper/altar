@@ -20,8 +20,9 @@ test('SQL: migración, privacidad, cupo, versiones y publicación atómica', asy
     const other = '22222222-2222-4222-8222-222222222222'
     await db.query('insert into auth.users values ($1), ($2)', [owner, other])
     await db.query("insert into public.altars(slug,name,objects,owner_id) values ('legacy','Publicado antes','[]',$1)", [owner])
-    await db.exec(readFileSync('supabase/017_private_drafts.sql', 'utf8'))
-    const content = { name: 'Privado', objects: [], photo: 'data:image/jpeg;base64,/9j/', clothColor: '#ffffff' }
+    for (const file of ['017_private_drafts.sql', '019_tribute.sql']) await db.exec(readFileSync(`supabase/${file}`, 'utf8'))
+    const tribute = { personName: 'Ana', birth: '1948', death: '2021', bio: 'Nació en Oaxaca', memories: [{ id: 1, text: 'Cantaba' }] }
+    const content = { name: 'Privado', objects: [], photo: 'data:image/jpeg;base64,/9j/', clothColor: '#ffffff', tribute }
     const commit = (slug, user, revision, data, publish = false) => db.query('select public.commit_altar_draft($1,$2,$3,$4,$5,$6) as result', [slug, user, revision, data, publish, publish ? 'https://example.test/public.jpg' : null])
     await commit('private', owner, 0, content)
     await db.exec('grant select on public.altar_drafts to anon, authenticated; set role anon;')
@@ -37,6 +38,9 @@ test('SQL: migración, privacidad, cupo, versiones y publicación atómica', asy
     const own = (await db.query('select * from public.my_altars()')).rows
     assert.equal(own.length, 2)
     assert.equal(own.find(a => a.slug === 'private').photo_url, content.photo)
+    // La dedicatoria privada solo se lee desde el borrador; el altar público sigue sin ella.
+    assert.deepEqual(own.find(a => a.slug === 'private').tribute, tribute)
+    assert.equal(own.find(a => a.slug === 'legacy').tribute, null)
     assert.equal(own.find(a => a.slug === 'legacy').revision, 1)
     assert.equal((await db.query('select * from public.altar_drafts')).rows.length, 0)
     await db.exec('reset role;')
@@ -44,10 +48,14 @@ test('SQL: migración, privacidad, cupo, versiones y publicación atómica', asy
     await commit('private', owner, 1, { ...content, name: 'Publicado' }, true)
     await commit('private', owner, 2, { ...content, name: 'Cambios privados' })
     assert.equal((await db.query("select name from public.altars where slug='private'")).rows[0].name, 'Publicado')
+    assert.deepEqual((await db.query("select tribute from public.altars where slug='private'")).rows[0].tribute, tribute)
+    await commit('private', owner, 3, { ...content, name: 'Publicado', tribute: null }, true)
+    assert.equal((await db.query("select tribute from public.altars where slug='private'")).rows[0].tribute, null)
+    await commit('private', owner, 4, { ...content, name: 'Cambios privados' })
     await assert.rejects(commit('private', owner, 2, { ...content, name: 'Sobrescritura' }, true), /más recientes/)
     assert.equal((await db.query("select name from public.altars where slug='private'")).rows[0].name, 'Publicado')
     await db.exec("update public.altars set status='hidden',reported_count=5 where slug='private'")
-    await commit('private', owner, 3, { ...content, name: 'Actualización publicada' }, true)
+    await commit('private', owner, 5, { ...content, name: 'Actualización publicada' }, true)
     const published = (await db.query("select name,status,reported_count from public.altars where slug='private'")).rows[0]
     assert.equal(published.name, 'Actualización publicada')
     assert.equal(published.status, 'hidden')

@@ -6,18 +6,30 @@ import { loadSharedAltar, reportAltar } from '../storage.js'
 import useMessagePages from '../useMessagePages.js'
 import { QualityControls } from '../QualityContext.jsx'
 import { supabase } from '../supabaseClient.js'
+import { readLocal, writeLocal } from '../localStore.js'
 import MessageForm from './MessageForm.jsx'
 import MessageList from './MessageList.jsx'
+import TributePanel from './TributePanel.jsx'
 import UserAccount from './UserAccount.jsx'
 
 const noop = () => {}
-const IDLE_DELAY_MS = 4000
+const IDLE_DELAY_MS = 6000
+const HINT_KEY = 'altar-viewer-drag-hint-v1'
+const HINT_DURATION_MS = 5000
 
 // Idle a nivel de página: sin actividad unos segundos, la UI se desvanece
 // (igual que arranca la órbita automática); reaparece al interactuar.
-function useIdle(delayMs) {
+// `active` mantiene el cronómetro en pausa (nunca oculta) mientras el altar
+// todavía está cargando: si no, la cuenta regresiva arrancaba desde el
+// montaje y la interfaz podía empezar a desvanecerse casi al instante en
+// que por fin aparecía, sin darle tiempo a nadie de leerla.
+function useIdle(delayMs, active) {
   const [idle, setIdle] = useState(false)
   useEffect(() => {
+    if (!active) {
+      setIdle(false)
+      return
+    }
     let timer = setTimeout(() => setIdle(true), delayMs)
     const wake = () => {
       setIdle(false)
@@ -39,8 +51,34 @@ function useIdle(delayMs) {
       window.removeEventListener('wheel', wake)
       window.removeEventListener('touchstart', wake)
     }
-  }, [delayMs])
+  }, [delayMs, active])
   return idle
+}
+
+// La escena es arrastrable pero nada lo indica: una pista breve, una sola
+// vez por navegador, que desaparece apenas alguien interactúa o a los pocos
+// segundos si nadie lo hace.
+function useDragHint(active) {
+  const [show, setShow] = useState(false)
+  useEffect(() => {
+    if (!active || readLocal(HINT_KEY)) return
+    setShow(true)
+    const dismiss = () => {
+      setShow(false)
+      writeLocal(HINT_KEY, '1')
+    }
+    const timer = setTimeout(dismiss, HINT_DURATION_MS)
+    window.addEventListener('pointerdown', dismiss)
+    window.addEventListener('wheel', dismiss, { passive: true })
+    window.addEventListener('touchstart', dismiss, { passive: true })
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('pointerdown', dismiss)
+      window.removeEventListener('wheel', dismiss)
+      window.removeEventListener('touchstart', dismiss)
+    }
+  }, [active])
+  return show
 }
 
 /**
@@ -50,14 +88,16 @@ function useIdle(delayMs) {
  */
 export default function AltarViewer({ slug }) {
   const focusRef = useRef(null)
-  const idle = useIdle(IDLE_DELAY_MS)
   const [data, setData] = useState(null)
   const [status, setStatus] = useState('loading') // 'loading' | 'ready' | 'missing' | 'error'
+  const idle = useIdle(IDLE_DELAY_MS, status === 'ready')
+  const showDragHint = useDragHint(status === 'ready')
   const messagePage = useMessagePages(slug, status === 'ready')
   const { messages } = messagePage
   const [retry, setRetry] = useState(0)
   const [showMessageForm, setShowMessageForm] = useState(false)
   const [showMessageList, setShowMessageList] = useState(false)
+  const [showTribute, setShowTribute] = useState(false)
   const [reportState, setReportState] = useState('idle') // 'idle' | 'sending' | 'sent' | 'error'
 
   useEffect(() => {
@@ -180,39 +220,63 @@ export default function AltarViewer({ slug }) {
           onTransform={noop}
           focusRef={focusRef}
           autoOrbit
+          uiIdle={idle}
           messages={messages}
         />
       </Canvas>
 
+      <div className={`viewer-drag-hint ${showDragHint ? '' : 'viewer-drag-hint--hidden'}`} aria-hidden="true">
+        <span>↔</span> Arrastra para mirar alrededor
+      </div>
+
       <div className={`viewer-ui ${idle ? 'viewer-ui--hidden' : ''}`}>
         <UserAccount compact />
         <div className="viewer-bar">
-          <span className="viewer-title">{data.name}</span>
-          <button className="btn" onClick={() => setShowMessageForm(true)}>
-            Dejar un mensaje
-          </button>
-          {(
-            <button className="btn" onClick={() => setShowMessageList(true)}>
-              Ver mensajes ({messages.length}{messagePage.hasMore ? '+' : ''})
+          <div className="viewer-bar-head">
+            <span className="viewer-title">{data.name}</span>
+            {data.tribute && (
+              <button className="btn viewer-tribute-btn" onClick={() => setShowTribute(true)}>
+                <span aria-hidden="true">✺</span>
+                {data.tribute.personName ? `Sobre ${data.tribute.personName}` : 'Su historia'}
+              </button>
+            )}
+          </div>
+          <div className="viewer-bar-actions">
+            <button className="btn btn--primary" onClick={() => setShowMessageForm(true)}>
+              Dejar un mensaje
             </button>
-          )}
-          <a className="btn" href="#/">
-            Crear mi propio altar
-          </a>
-          <button
-            className="btn viewer-report-btn"
-            onClick={handleReport}
-            disabled={reportState === 'sending' || reportState === 'sent'}
-            title="Reportar este altar por contenido inapropiado"
-          >
-            {reportState === 'sent' ? 'Reportado' : 'Reportar'}
-          </button>
+            <button className="btn" onClick={() => setShowMessageList(true)}>
+              Mensajes ({messages.length}{messagePage.hasMore ? '+' : ''})
+            </button>
+          </div>
+          <div className="viewer-bar-foot">
+            <a className="viewer-link-btn" href="#/">
+              Crear mi propio altar
+            </a>
+            <button
+              className="viewer-link-btn viewer-report-btn"
+              onClick={handleReport}
+              disabled={reportState === 'sending' || reportState === 'sent'}
+              title="Reportar este altar por contenido inapropiado"
+            >
+              {reportState === 'sent' ? 'Reportado' : 'Reportar'}
+            </button>
+          </div>
         </div>
         {reportState === 'error' && (
           <div className="viewer-report-error">No se pudo enviar el reporte. Probá de nuevo.</div>
         )}
         <MusicPlayer />
       </div>
+
+      {showTribute && data.tribute && (
+        <TributePanel
+          tribute={data.tribute}
+          photo={data.photo}
+          altarName={data.name}
+          onClose={() => setShowTribute(false)}
+        />
+      )}
 
       {showMessageForm && (
         <MessageForm
