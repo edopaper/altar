@@ -1037,6 +1037,21 @@ canvas {
 }
 
 /* ---------- CIET ---------- */
+/* Envuelve el Canvas y el título: al rotar de altar se funde a negro, JS
+   cambia los datos con la pantalla ya oscura y vuelve a aparecer, en vez de
+   que los objetos salten de golpe a otras posiciones. La duración debe
+   coincidir con FADE_MS en CietPage.jsx. */
+.ciet-scene {
+  position: absolute;
+  inset: 0;
+  opacity: 1;
+  transition: opacity 0.7s ease;
+}
+
+.ciet-scene--fading {
+  opacity: 0;
+}
+
 .ciet-ui {
   opacity: 1;
   transition: opacity 0.8s ease;

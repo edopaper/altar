@@ -10,6 +10,10 @@ import { QualityControls } from '../QualityContext.jsx'
 const DEFAULT_CIET_INTERVAL = 30
 const MIN_CIET_INTERVAL = 5
 const IDLE_DELAY_MS = 4000
+// Se funde a negro, se cambia de altar detrás de ese velo y se vuelve a
+// mostrar: oculta el "salto" de que los objetos aparezcan de golpe en otras
+// posiciones. Debe coincidir con la transición de .ciet-scene en styles.css.
+const FADE_MS = 700
 const noop = () => {}
 const StableMusicPlayer = memo(MusicPlayer)
 
@@ -62,6 +66,8 @@ export default function CietPage() {
   const [altars, setAltars] = useState([])
   const [intervalSeconds, setIntervalSeconds] = useState(DEFAULT_CIET_INTERVAL)
   const [activeIndex, setActiveIndex] = useState(0)
+  const [fading, setFading] = useState(false)
+  const fadeTimerRef = useRef(null)
 
   const activeAltar = altars[activeIndex] ?? null
   const intervalMs = useMemo(
@@ -147,9 +153,19 @@ export default function CietPage() {
   useEffect(() => {
     if (status !== 'ready' || altars.length <= 1) return undefined
     const timer = setInterval(() => {
-      setActiveIndex((value) => (value + 1) % altars.length)
+      setFading(true)
+      // El cambio real de altar ocurre a mitad del fundido, con la pantalla
+      // ya en negro: para cuando reaparece, la escena nueva ya está armada.
+      fadeTimerRef.current = setTimeout(() => {
+        setActiveIndex((value) => (value + 1) % altars.length)
+        setFading(false)
+      }, FADE_MS)
     }, intervalMs)
-    return () => clearInterval(timer)
+    return () => {
+      clearInterval(timer)
+      clearTimeout(fadeTimerRef.current)
+      setFading(false)
+    }
   }, [altars.length, intervalMs, status])
 
   const handleLogin = async () => {
@@ -218,31 +234,33 @@ export default function CietPage() {
       <div className={`ciet-ui ${idle ? 'ciet-ui--hidden' : ''}`}>
         <QualityControls floating />
       </div>
-      <Canvas shadows dpr={[1, 1.5]} camera={{ position: [0, 3.2, 5.5], fov: 50 }}>
-        <AltarScene
-          photo={activeAltar.photo}
-          clothColor={activeAltar.clothColor}
-          objects={activeAltar.objects}
-          selectedIds={[]}
-          mode="translate"
-          snap={false}
-          onSelect={noop}
-          onTransform={noop}
-          focusRef={focusRef}
-          autoOrbit
-          uiIdle={idle}
-          respectReducedMotionForAutoOrbit={false}
-          messages={[]}
-        />
-      </Canvas>
+      <div className={`ciet-scene ${fading ? 'ciet-scene--fading' : ''}`}>
+        <Canvas shadows dpr={[1, 1.5]} camera={{ position: [0, 3.2, 5.5], fov: 50 }}>
+          <AltarScene
+            photo={activeAltar.photo}
+            clothColor={activeAltar.clothColor}
+            objects={activeAltar.objects}
+            selectedIds={[]}
+            mode="translate"
+            snap={false}
+            onSelect={noop}
+            onTransform={noop}
+            focusRef={focusRef}
+            autoOrbit
+            uiIdle={idle}
+            respectReducedMotionForAutoOrbit={false}
+            messages={[]}
+          />
+        </Canvas>
 
-      <div className="ciet-overlay">
-        <div>
-          <span className="ciet-kicker">Altares CGTI</span>
-          <h1>{activeAltar.name}</h1>
-        </div>
-        <div className={`ciet-meta ciet-ui ${idle ? 'ciet-ui--hidden' : ''}`}>
-          {activeIndex + 1} / {altars.length} · cambia cada {Math.round(intervalMs / 1000)}s
+        <div className="ciet-overlay">
+          <div>
+            <span className="ciet-kicker">Altares CGTI</span>
+            <h1>{activeAltar.name}</h1>
+          </div>
+          <div className={`ciet-meta ciet-ui ${idle ? 'ciet-ui--hidden' : ''}`}>
+            {activeIndex + 1} / {altars.length} · cambia cada {Math.round(intervalMs / 1000)}s
+          </div>
         </div>
       </div>
 
