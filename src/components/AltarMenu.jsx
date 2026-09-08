@@ -91,6 +91,7 @@ export default function AltarMenu({
   onModeChange,
   hasPhoto,
   onUploadPhoto,
+  onEditPhoto,
   onRemovePhoto,
   clothColor,
   onClothColorChange,
@@ -356,6 +357,11 @@ export default function AltarMenu({
               }}
             />
           </label>
+          {hasPhoto && (
+            <button className="btn" onClick={onEditPhoto}>
+              Encuadrar
+            </button>
+          )}
           {hasPhoto && (
             <button className="btn btn--danger" onClick={onRemovePhoto}>
               Quitar

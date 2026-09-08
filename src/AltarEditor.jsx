@@ -13,6 +13,7 @@ import AltarMenu from './components/AltarMenu.jsx'
 import TransformToolbar from './components/TransformToolbar.jsx'
 import MusicPlayer from './components/MusicPlayer.jsx'
 import UserAccount from './components/UserAccount.jsx'
+import PhotoCropModal from './components/PhotoCropModal.jsx'
 const AboutPanel = lazy(() => import('./components/AboutPanel.jsx'))
 const HelpPanel = lazy(() => import('./components/HelpPanel.jsx'))
 const Onboarding = lazy(() => import('./components/Onboarding.jsx'))
@@ -40,20 +41,6 @@ const DEFAULT_CLOTH_COLOR = '#f7f2e8'
 const MAX_OBJECTS = 150
 const OBJECTS_WARNING_THRESHOLD = 100
 const PHOTO_MAX_BYTES = 5 * 1024 * 1024 // 5 MB
-const PHOTO_SIZE = 512
-
-// Escala la imagen conservando su proporción (máximo 512 px por lado, sin
-// recortar) y la devuelve como data URL JPEG lista para localStorage.
-async function processPhoto(file) {
-  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
-  const scale = Math.min(1, PHOTO_SIZE / Math.max(bitmap.width, bitmap.height))
-  const canvas = document.createElement('canvas')
-  canvas.width = Math.max(1, Math.round(bitmap.width * scale))
-  canvas.height = Math.max(1, Math.round(bitmap.height * scale))
-  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height)
-  bitmap.close()
-  return canvas.toDataURL('image/jpeg', 0.85)
-}
 
 // Intenta copiar al portapapeles; si el navegador lo bloquea (permiso,
 // contexto no seguro, etc.) devuelve false para que el caller lo indique.
@@ -226,6 +213,7 @@ export default function AltarEditor({ initialAltar = null, draftPrefix = '' }) {
   }, [])
 
   const [photo, setPhoto] = useState(workspace.content.photo)
+  const [photoCropSource, setPhotoCropSource] = useState(null)
   // Modal de compartir (redes sociales + link): null mientras está cerrado.
   const [shareInfo, setShareInfo] = useState(null)
   // Captura (data URL) mostrada en el modal de confirmación previo a
@@ -285,16 +273,38 @@ export default function AltarEditor({ initialAltar = null, draftPrefix = '' }) {
       window.alert('La imagen no puede pesar más de 5 MB.')
       return
     }
-    try {
-      const dataUrl = await processPhoto(file)
-      setPhoto(dataUrl)
-    } catch {
-      window.alert('No se pudo procesar la imagen.')
-    }
+    const sourceUrl = URL.createObjectURL(file)
+    setPhotoCropSource((current) => {
+      if (current?.revoke) URL.revokeObjectURL(current.url)
+      return { url: sourceUrl, revoke: true }
+    })
   }
+
+  const editPhotoCrop = () => {
+    if (photo) setPhotoCropSource({ url: photo, revoke: false })
+  }
+
+  const closePhotoCrop = () => {
+    setPhotoCropSource((current) => {
+      if (current?.revoke) URL.revokeObjectURL(current.url)
+      return null
+    })
+  }
+
+  const confirmPhotoCrop = (dataUrl) => {
+    setPhoto(dataUrl)
+    closePhotoCrop()
+  }
+
+  useEffect(() => () => {
+    if (photoCropSource?.revoke) URL.revokeObjectURL(photoCropSource.url)
+  }, [photoCropSource])
 
   const removePhoto = () => {
     setPhoto(null)
+    if (photoCropSource) {
+      closePhotoCrop()
+    }
   }
 
   // Paso previo a compartir: muestra una captura de la escena para
@@ -677,6 +687,7 @@ export default function AltarEditor({ initialAltar = null, draftPrefix = '' }) {
         onClearAltar={clearAltar}
         hasPhoto={!!photo}
         onUploadPhoto={uploadPhoto}
+        onEditPhoto={editPhotoCrop}
         onRemovePhoto={removePhoto}
         clothColor={clothColor}
         onClothColorChange={setClothColor}
@@ -714,6 +725,13 @@ export default function AltarEditor({ initialAltar = null, draftPrefix = '' }) {
             shareAltar()
           }}
           onClose={() => setSharePreview(null)}
+        />
+      )}
+      {photoCropSource && (
+        <PhotoCropModal
+          source={photoCropSource.url}
+          onCancel={closePhotoCrop}
+          onConfirm={confirmPhotoCrop}
         />
       )}
 
